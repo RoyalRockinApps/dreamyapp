@@ -1,11 +1,14 @@
 name: Build app & website
 
-# Every push: checks → Android APK + website.
-# Pushes to the default branch also publish:
+# Pushes to main (and PRs into it): checks → Android APK + website.
+# Pushes to main also publish:
 #   • the APK to the rolling "android-latest" GitHub Release (stable download link)
 #   • the website to GitHub Pages
 on:
   push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -79,7 +82,7 @@ jobs:
 
   publish-apk:
     needs: android
-    if: github.ref_name == github.event.repository.default_branch
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -128,7 +131,7 @@ jobs:
 
   deploy-web:
     needs: web
-    if: github.ref_name == github.event.repository.default_branch
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
       pages: write

@@ -88,13 +88,13 @@ sets real rates in **Settings → Rental rates & policy**.
 
 ## Download the APK & open the website
 
-`.github/workflows/build.yml` runs on every push:
+`.github/workflows/build.yml` runs on every push to `main` (and on pull requests into it):
 
 1. **Checks:** typecheck, lint, unit tests.
 2. **Android:** `expo prebuild` + Gradle `assembleRelease` produce an installable APK
    (downloadable from the run's *Artifacts*).
 3. **Website:** `expo export --platform web` builds the same app for browsers, under `/dreamyapp/`.
-4. On the **default branch** it also publishes:
+4. On **main** it also publishes:
    - **APK →** https://github.com/RoyalRockinApps/dreamyapp/releases/download/android-latest/dream-theatre.apk
      (a rolling *android-latest* release, replaced on every push)
    - **Website →** https://royalrockinapps.github.io/dreamyapp/ (admin portal at `/dreamyapp/admin`)
