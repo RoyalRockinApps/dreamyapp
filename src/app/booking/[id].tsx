@@ -2,15 +2,13 @@ import { router, Stack, useLocalSearchParams, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Share, View } from 'react-native';
 
-import { Button, Card, Chips, Divider, Empty, Field, KeyValue, ListItem, Pill, ProgressBar, Row, Screen, SectionHeader, Txt } from '@/components/ui';
+import { Button, Card, Chips, Collapsible, Divider, Empty, Field, IconButton, KeyValue, ListItem, Pill, ProgressBar, Row, Screen, SectionHeader, Txt } from '@/components/ui';
 import { fmtDate, fmtRange, fmtTime, money, relativeDay } from '@/lib/dates';
 import { amountPaid, bookingSummaryText, grandTotal, outstanding } from '@/lib/pricing';
-import type { BookingStatus, PaymentMethod } from '@/lib/types';
+import type { PaymentMethod } from '@/lib/types';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C, STATUS_META } from '@/theme';
 import { alert } from '@/components/alert';
-
-const FLOW: BookingStatus[] = ['inquiry', 'awaiting_deposit', 'confirmed', 'completed'];
 
 function confirm(title: string, message: string, onYes: () => void, destructive = false) {
   alert(title, message, [
@@ -66,24 +64,16 @@ export default function BookingDetail() {
 
   return (
     <Screen>
-      <Stack.Screen options={{ title: meta.label }} />
+      <Stack.Screen options={{ title: 'Booking' }} />
       <Card accent={meta.color}>
         <Row>
-          <Pill label={meta.label} color={meta.color} bg={meta.bg} />
-          {holdExpired && <Pill label="Hold expired" color={C.danger} bg={C.dangerSoft} />}
-          {b.ticketed && <Pill label="Ticketed" icon="ticket" color={C.curtain} bg={C.curtain + '22'} />}
+          <Pill label={holdExpired ? 'Hold expired' : meta.label} color={holdExpired ? C.danger : meta.color} bg={holdExpired ? C.dangerSoft : meta.bg} />
         </Row>
         <Txt v="h1">{b.title}</Txt>
         <Txt v="muted">{fmtRange(b.start, b.end)}</Txt>
-        <Row style={{ flexWrap: 'wrap' }}>
-          <Pill label={b.eventType} />
-          <Pill label={`${b.attendance} guests`} icon="people" />
-          <Pill label={`${b.quote.hours} hrs`} icon="time" />
-          {!b.isPublic && <Pill label="Private" icon="eye-off" />}
-        </Row>
-        {live && <StatusTrack status={b.status} />}
+        <Txt v="small">{`${b.eventType} · ${b.attendance} guests${b.isPublic ? '' : ' · private'}`}</Txt>
         {b.status === 'awaiting_deposit' && b.holdExpiresAt && !holdExpired && (
-          <Txt v="small" color={C.warn}>{`Date held until ${relativeDay(b.holdExpiresAt)} ${fmtTime(b.holdExpiresAt)} — then it's released to others.`}</Txt>
+          <Txt v="small" color={C.warn}>{`Date held until ${relativeDay(b.holdExpiresAt)} ${fmtTime(b.holdExpiresAt)}`}</Txt>
         )}
       </Card>
 
@@ -107,16 +97,25 @@ export default function BookingDetail() {
       )}
 
       {/* ---- Money ---- */}
-      <SectionHeader title="Payments" />
       <Card>
         <Row>
-          <Txt v="h2" style={{ flex: 1 }}>{money(paid, true)}</Txt>
-          <Txt v="muted">{`of ${money(grandTotal(b), true)}`}</Txt>
+          <Txt v="h2" style={{ flex: 1 }}>{`${money(paid)} paid`}</Txt>
+          <Txt v="muted">{`of ${money(grandTotal(b))}`}</Txt>
         </Row>
         <ProgressBar value={paid / grandTotal(b)} color={due === 0 ? C.green : C.gold} />
-        <KeyValue k="Reservation + security deposit" v={money(b.quote.depositDue, true)} color={depositRemaining === 0 ? C.green : undefined} />
-        <KeyValue k={`Balance due ${fmtDate(b.quote.balanceDueDate, { year: true })}`} v={money(b.quote.balanceDue, true)} />
-        <KeyValue k="Outstanding" v={money(due, true)} strong color={due ? C.warn : C.green} />
+        <Txt v="small" color={due ? C.warn : C.green}>
+          {due === 0 ? 'Paid in full' : depositRemaining > 0 ? `${money(depositRemaining, true)} deposit due now` : `${money(due, true)} balance due ${fmtDate(b.quote.balanceDueDate)}`}
+        </Txt>
+      </Card>
+
+      <Collapsible title="Payments & quote" subtitle={`Rental ${money(b.quote.rentalTotal)} + ${money(b.quote.securityDeposit)} refundable deposit`} icon="receipt-outline">
+        {b.quote.lines.map((l) => (
+          <KeyValue key={l.label} k={l.label} v={money(l.amount, true)} />
+        ))}
+        <KeyValue k="Security deposit (refundable)" v={money(b.quote.securityDeposit, true)} />
+        <Divider />
+        <KeyValue k="Due to reserve" v={money(b.quote.depositDue, true)} />
+        <KeyValue k={`Balance by ${fmtDate(b.quote.balanceDueDate)}`} v={money(b.quote.balanceDue, true)} />
         {b.payments.length > 0 && <Divider />}
         {b.payments.map((p) => (
           <ListItem
@@ -150,22 +149,12 @@ export default function BookingDetail() {
             )}
           </View>
         )}
-      </Card>
-
-      <SectionHeader title="Quote" />
-      <Card>
-        {b.quote.lines.map((l) => (
-          <KeyValue key={l.label} k={l.label} v={money(l.amount, true)} />
-        ))}
-        <Divider />
-        <KeyValue k="Rental total" v={money(b.quote.rentalTotal, true)} strong />
-        <KeyValue k="Security deposit (refundable)" v={money(b.quote.securityDeposit, true)} />
-      </Card>
+      </Collapsible>
 
       {/* ---- Ticketing for renters who bought the box office add-on ---- */}
       {(b.ticketed || linkedShows.length > 0) && (
         <>
-          <SectionHeader title="Ticket sales" action={isOwner && live ? 'Add performance' : undefined} onAction={() => router.push(`/performance/new?bookingId=${b.id}` as Href)} />
+          <SectionHeader title="Ticket sales" action={isOwner && live ? '+ Add' : undefined} onAction={() => router.push(`/performance/new?bookingId=${b.id}` as Href)} />
           {linkedShows.length === 0 && <Txt v="muted">No performances on sale yet.</Txt>}
           {linkedShows.map((p) => {
             const sold = Object.values(p.seats).filter((c) => c.status === 'sold' || c.status === 'comp').length;
@@ -174,26 +163,21 @@ export default function BookingDetail() {
         </>
       )}
 
-      <SectionHeader title="Contact" />
       <Card>
-        <Txt v="h3">{b.contactName}</Txt>
-        {b.organization ? <Txt v="small">{b.organization}</Txt> : null}
-        <ListItem icon="call" title={b.contactPhone} onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\D/g, '')}`)} />
-        <ListItem icon="mail" title={b.contactEmail} onPress={() => Linking.openURL(`mailto:${b.contactEmail}?subject=${encodeURIComponent(b.title)}`)} />
+        <Row>
+          <View style={{ flex: 1 }}>
+            <Txt v="h3">{b.contactName}</Txt>
+            {b.organization && b.organization !== b.contactName ? <Txt v="small">{b.organization}</Txt> : null}
+          </View>
+          <IconButton icon="call" color={C.gold} onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\D/g, '')}`)} />
+          <IconButton icon="mail" color={C.gold} onPress={() => Linking.openURL(`mailto:${b.contactEmail}?subject=${encodeURIComponent(b.title)}`)} />
+        </Row>
+        {b.notes ? <Txt v="small">{`“${b.notes}”`}</Txt> : null}
       </Card>
-
-      {b.notes ? (
-        <>
-          <SectionHeader title="Notes" />
-          <Card>
-            <Txt>{b.notes}</Txt>
-          </Card>
-        </>
-      ) : null}
 
       {/* ---- Secondary actions ---- */}
       {isOwner && live && (
-        <View style={{ gap: 8, marginTop: 8 }}>
+        <Collapsible title="More actions" icon="ellipsis-horizontal-circle-outline">
           {b.status === 'awaiting_deposit' && (
             <Button variant="secondary" icon="time" title={`Extend hold ${settings.holdHours} hrs`} onPress={() => setStatus(b.id, 'awaiting_deposit')} />
           )}
@@ -204,26 +188,11 @@ export default function BookingDetail() {
           {b.status !== 'completed' && (
             <Button variant="danger" icon="close-circle" title="Cancel booking" onPress={() => confirm('Cancel this booking?', 'The date will be released. Refund deposits per your policy from the Payments section.', () => setStatus(b.id, 'cancelled'), true)} />
           )}
-        </View>
+        </Collapsible>
       )}
       {!isOwner && (b.status === 'inquiry' || b.status === 'awaiting_deposit') && (
         <Button variant="danger" title="Withdraw request" onPress={() => confirm('Withdraw request?', 'This releases the date.', () => setStatus(b.id, 'cancelled'), true)} />
       )}
     </Screen>
-  );
-}
-
-function StatusTrack({ status }: { status: BookingStatus }) {
-  const idx = FLOW.indexOf(status);
-  const labels = ['Requested', 'Approved', 'Deposit paid', 'Completed'];
-  return (
-    <View style={{ flexDirection: 'row', gap: 6, marginTop: 6 }}>
-      {labels.map((l, i) => (
-        <View key={l} style={{ flex: 1, gap: 4 }}>
-          <View style={{ height: 4, borderRadius: 2, backgroundColor: i <= idx ? C.gold : C.surface2 }} />
-          <Txt v="small" color={i <= idx ? C.text : C.faint} style={{ fontSize: 10 }}>{l}</Txt>
-        </View>
-      ))}
-    </View>
   );
 }

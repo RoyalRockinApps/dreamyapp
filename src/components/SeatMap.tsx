@@ -27,9 +27,11 @@ interface Props {
   house?: HouseConfig;
   /** start in whole-house view */
   initialZoom?: 'fit' | 'zoom';
+  /** shown in the legend next to each tier */
+  prices?: Record<PriceTier, number>;
 }
 
-export function SeatMap({ claims, holderId, selected, onToggle, manage, now, house, initialZoom = 'zoom' }: Props) {
+export function SeatMap({ claims, holderId, selected, onToggle, manage, now, house, initialZoom = 'zoom', prices }: Props) {
   const { width } = useWindowDimensions();
   const [zoom, setZoom] = useState<'fit' | 'zoom'>(initialZoom);
   const savedHouse = useStore((st) => st.house); // re-render when the owner changes the layout
@@ -155,12 +157,12 @@ export function SeatMap({ claims, holderId, selected, onToggle, manage, now, hou
       ) : (
         map
       )}
-      <Legend />
+      <Legend prices={prices} />
     </View>
   );
 }
 
-export function Legend() {
+export function Legend({ prices }: { prices?: Record<PriceTier, number> }) {
   const item = (color: string, label: string, filled = false) => (
     <View key={label} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <View style={{ width: 12, height: 12, borderRadius: 3, backgroundColor: filled ? color : color + '40', borderWidth: 1, borderColor: color }} />
@@ -169,11 +171,9 @@ export function Legend() {
   );
   return (
     <View style={s.legend}>
-      {(Object.keys(TIER_COLOR) as PriceTier[]).map((t) => item(TIER_COLOR[t], TIER_LABEL[t]))}
-      {item('#FFFFFF', 'Your seats', true)}
-      {item('#2B2640', 'Sold', true)}
-      {item(C.warn, 'In someone’s cart')}
-      {item(C.faint, 'Unavailable')}
+      {(Object.keys(TIER_COLOR) as PriceTier[]).map((t) => item(TIER_COLOR[t], prices ? `${TIER_LABEL[t]} $${prices[t]}` : TIER_LABEL[t]))}
+      {item('#FFFFFF', 'Yours', true)}
+      {item('#2B2640', 'Taken', true)}
     </View>
   );
 }

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { MonthCalendar } from '@/components/MonthCalendar';
-import { Avatar, Button, Card, Chips, Empty, Field, ListItem, Pill, ProgressBar, Row, Screen, SectionHeader, Segmented, Txt } from '@/components/ui';
+import { Avatar, Button, Card, Chips, Collapsible, Empty, Field, ListItem, Pill, ProgressBar, Row, Screen, Segmented, Txt } from '@/components/ui';
 import { useNow } from '@/hooks/useAgenda';
 import { useChannels } from '@/hooks/useChannels';
 import { atMinutes, dayKey, fmtDate, fmtTime, relativeDay, timeAgo } from '@/lib/dates';
@@ -29,11 +29,7 @@ export default function ProductionHub() {
   return (
     <Screen>
       <Stack.Screen options={{ title: production.title }} />
-      <Card accent={production.color}>
-        <Txt v="h1">{production.title}</Txt>
-        {production.tagline ? <Txt v="muted" style={{ fontStyle: 'italic' }}>{production.tagline}</Txt> : null}
-        <Txt v="small">{`${fmtDate(production.openingDate, { weekday: true })} – ${fmtDate(production.closingDate, { weekday: true, year: true })}`}</Txt>
-      </Card>
+      <Txt v="small">{`Runs ${fmtDate(production.openingDate, { weekday: true })} – ${fmtDate(production.closingDate, { weekday: true })}`}</Txt>
       <Segmented
         options={['schedule', 'company', 'chat', 'tickets'] as const}
         value={tab}
@@ -55,8 +51,9 @@ function ScheduleTab({ p, highlight }: { p: Production; highlight?: string }) {
   const isOwner = user.role === 'owner' || !!p.members.find((m) => m.userId === user.id)?.isDirector;
   const schedule = useStore((s) => s.schedule);
   const conflicts = useStore((s) => s.conflicts);
-  const [showPast, setShowPast] = useState(false);
-  const [mineOnly, setMineOnly] = useState(!isOwner);
+  const [view, setView] = useState<'mine' | 'all' | 'past'>(isOwner ? 'all' : 'mine');
+  const showPast = view === 'past';
+  const mineOnly = view === 'mine';
   const now = useNow(60000);
 
   const items = useMemo(
@@ -79,9 +76,11 @@ function ScheduleTab({ p, highlight }: { p: Production; highlight?: string }) {
 
   return (
     <View style={{ gap: 12 }}>
-      {isOwner && <Button icon="add" title="Schedule a call" onPress={() => router.push(`/rehearsal/edit?productionId=${p.id}` as Href)} />}
-      <Segmented options={['upcoming', 'past'] as const} value={showPast ? 'past' : 'upcoming'} onChange={(v) => setShowPast(v === 'past')} labels={{ upcoming: 'Upcoming', past: 'Past' }} />
-      <Chips options={['mine', 'all'] as const} value={mineOnly ? 'mine' : 'all'} onChange={(v) => setMineOnly(v === 'mine')} labels={{ mine: "Calls I'm in", all: 'Whole company' }} />
+      {isOwner ? (
+        <Segmented options={['all', 'past'] as const} value={view === 'mine' ? 'all' : view} onChange={setView} labels={{ all: 'Upcoming', past: 'Past' }} />
+      ) : (
+        <Segmented options={['mine', 'all', 'past'] as const} value={view} onChange={setView} labels={{ mine: 'My calls', all: 'Everyone', past: 'Past' }} />
+      )}
       {days.length === 0 && <Empty icon="calendar-outline" title={showPast ? 'No past calls' : 'Nothing scheduled'} />}
       {days.map(([k, list]) => (
         <View key={k} style={{ gap: 8 }}>
@@ -91,6 +90,7 @@ function ScheduleTab({ p, highlight }: { p: Production; highlight?: string }) {
           ))}
         </View>
       ))}
+      {isOwner && <Button variant="secondary" icon="add" title="Schedule a call" onPress={() => router.push(`/rehearsal/edit?productionId=${p.id}` as Href)} />}
       <ConflictsSection p={p} isOwner={isOwner} conflicts={conflicts.filter((c) => c.productionId === p.id)} />
     </View>
   );
@@ -121,22 +121,15 @@ function ScheduleCard({ item, p, canEdit, highlighted }: { item: ScheduleItem; p
         <Txt v="h3" style={{ flex: 1 }}>{item.title}</Txt>
         {canEdit && <Ionicons name="create-outline" size={20} color={C.gold} onPress={() => router.push(`/rehearsal/edit?id=${item.id}` as Href)} />}
       </Row>
-      <Txt v="muted">{`${fmtTime(item.start)}–${fmtTime(item.end)} · ${item.space}`}</Txt>
-      <Row style={{ flexWrap: 'wrap' }}>
-        <Pill label={item.kind} color={kindColor} bg={kindColor + '22'} />
-        {groups ? groups.map((g) => <Pill key={g!.id} label={g!.name} color={g!.color} bg={g!.color + '22'} />) : <Pill label="Full company" icon="people" />}
-        {clashes.length > 0 && canEdit && <Pill icon="warning" label={`${clashes.length} conflict${clashes.length > 1 ? 's' : ''}`} color={C.warn} bg={C.warnSoft} />}
-      </Row>
-      {item.notes ? <Txt v="small">{item.notes}</Txt> : null}
-
+      <Txt v="small">{`${fmtTime(item.start)}–${fmtTime(item.end)} · ${item.space} · ${groups ? groups.map((g) => g!.name).join(', ') : 'Full company'}`}</Txt>
       {canEdit && (
-        <View style={{ gap: 4 }}>
-          <ProgressBar value={counts.yes / Math.max(1, called.length)} color={C.green} />
-          <Txt v="small">{`${counts.yes} going · ${counts.maybe} maybe · ${counts.no} out · ${counts.none} no reply`}</Txt>
-        </View>
+        <Txt v="small" color={clashes.length ? C.warn : C.muted}>
+          {`${counts.yes}/${called.length} going${counts.none ? ` · ${counts.none} no reply` : ''}${clashes.length ? ` · ${clashes.length} conflict${clashes.length > 1 ? 's' : ''}` : ''}`}
+        </Txt>
       )}
+      {open && item.notes ? <Txt v="small">{item.notes}</Txt> : null}
 
-      {amCalled && !isPast && (
+      {amCalled && !canEdit && !isPast && (
         <Row>
           {(['yes', 'maybe', 'no'] as Rsvp[]).map((r) => (
             <Button key={r} small style={{ flex: 1 }} title={r === 'yes' ? 'Going' : r === 'maybe' ? 'Maybe' : "Can't"} variant={item.rsvps[user.id] === r ? (r === 'no' ? 'danger' : 'success') : 'secondary'} onPress={() => rsvp(item.id, user.id, r)} />
@@ -180,10 +173,10 @@ function ConflictsSection({ p, isOwner, conflicts }: { p: Production; isOwner: b
   const shown = isOwner ? conflicts : mine;
 
   return (
-    <View style={{ gap: 8 }}>
-      <SectionHeader title={isOwner ? 'Company conflicts' : 'My conflicts'} action={isMember ? (adding ? 'Close' : 'Add conflict') : undefined} onAction={() => setAdding(!adding)} />
+    <Collapsible title={isOwner ? 'Company conflicts' : 'My conflicts'} subtitle={shown.length ? `${shown.length} submitted` : 'None submitted'} icon="calendar-clear-outline">
+      {isMember && !adding && <Button small variant="secondary" icon="add" title="Add a date I can’t make" onPress={() => setAdding(true)} />}
       {adding && (
-        <Card>
+        <View style={{ gap: 10 }}>
           <MonthCalendar year={ym.y} month={ym.m} onChangeMonth={(y, m) => setYm({ y, m })} selected={day} onSelect={setDay} minDate={dayKey(today)} />
           <Field label="Reason" value={note} onChangeText={setNote} placeholder="Work, travel, school event…" />
           <Button
@@ -194,9 +187,8 @@ function ConflictsSection({ p, isOwner, conflicts }: { p: Production; isOwner: b
               setAdding(false);
             }}
           />
-        </Card>
+        </View>
       )}
-      {shown.length === 0 && <Txt v="muted">No conflicts submitted.</Txt>}
       {shown
         .slice()
         .sort((a, b) => a.start.localeCompare(b.start))
@@ -210,7 +202,7 @@ function ConflictsSection({ p, isOwner, conflicts }: { p: Production; isOwner: b
             right={c.userId === user.id ? <Ionicons name="trash-outline" size={18} color={C.danger} onPress={() => removeConflict(c.id)} /> : undefined}
           />
         ))}
-    </View>
+    </Collapsible>
   );
 }
 

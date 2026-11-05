@@ -1,15 +1,12 @@
 import { router, type Href } from 'expo-router';
-import { useMemo } from 'react';
-import { Linking, Platform, Pressable, View } from 'react-native';
+import { Linking, Platform, View } from 'react-native';
 
-import { AgendaRow } from '@/components/AgendaRow';
-import { Button, Card, Empty, ListItem, Pill, ProgressBar, Row, Screen, SectionHeader, Stat, Txt, type IconName } from '@/components/ui';
-import { useAgenda } from '@/hooks/useAgenda';
-import { fmtDate, fmtRange, fmtTime, money, relativeDay, WEEKDAYS, MONTHS } from '@/lib/dates';
+import { Button, Card, Empty, Group, Line, Row, Screen, SectionHeader, Shortcuts, Txt } from '@/components/ui';
+import { KIND_COLOR, useAgenda } from '@/hooks/useAgenda';
+import { fmtDate, fmtTime, money, MONTHS, relativeDay, WEEKDAYS } from '@/lib/dates';
 import { APK_URL } from '@/lib/links';
-import { amountPaid, outstanding } from '@/lib/pricing';
+import { outstanding } from '@/lib/pricing';
 import { isCalled } from '@/lib/scheduling';
-import { salesSummary } from '@/lib/seating';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C, STATUS_META } from '@/theme';
 
@@ -20,174 +17,146 @@ export default function Home() {
   return <OwnerHome />;
 }
 
-function Hero({ greeting }: { greeting: string }) {
+function Greeting({ name, tagline }: { name?: string; tagline?: boolean }) {
   const venue = useStore((s) => s.venue);
   const d = new Date();
+  const h = d.getHours();
+  const hello = h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening';
   return (
-    <View style={{ paddingVertical: 8, gap: 4 }}>
+    <View style={{ gap: 4, paddingTop: 4 }}>
       <Txt v="label" color={C.gold}>{`${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`}</Txt>
-      <Txt v="display">{greeting}</Txt>
-      <Txt v="muted" style={{ fontStyle: 'italic' }}>{venue.tagline}</Txt>
-      {Platform.OS === 'web' && APK_URL ? (
-        <Card style={{ marginTop: 8, paddingVertical: 10 }}>
-          <ListItem icon="logo-android" iconColor={C.green} title="Get the Android app" subtitle="Same features, on your phone — download the APK" onPress={() => Linking.openURL(APK_URL)} />
-        </Card>
-      ) : null}
+      <Txt v="h1">{name ? `${hello}, ${name}` : hello}</Txt>
+      {tagline ? <Txt v="muted" style={{ fontStyle: 'italic' }}>{venue.tagline}</Txt> : null}
     </View>
   );
 }
 
-function QuickAction({ icon, label, onPress, color = C.gold }: { icon: IconName; label: string; onPress: () => void; color?: string }) {
-  return (
-    <Pressable onPress={onPress} style={({ pressed }) => ({ flex: 1, minWidth: 140, opacity: pressed ? 0.7 : 1 })}>
-      <Card style={{ alignItems: 'flex-start', gap: 10 }}>
-        <ListItem icon={icon} iconColor={color} title={label} />
-      </Card>
-    </Pressable>
-  );
-}
-
 function OwnerHome() {
-  const user = useCurrentUser();
   const bookings = useStore((s) => s.bookings);
   const performances = useStore((s) => s.performances);
-  const orders = useStore((s) => s.orders);
   const agenda = useAgenda();
   const now = new Date();
 
-  const requests = bookings.filter((b) => b.status === 'inquiry');
-  const awaiting = bookings.filter((b) => b.status === 'awaiting_deposit');
-  const balancesDue = bookings.filter((b) => b.status === 'confirmed' && outstanding(b) > 0);
-  const overdue = balancesDue.filter((b) => new Date(b.quote.balanceDueDate) < now);
-  const upcoming = agenda.filter((a) => new Date(a.end) >= now).slice(0, 6);
-
-  const monthKey = `${now.getFullYear()}-${now.getMonth()}`;
-  const collected = useMemo(() => {
-    let rentals = 0;
-    for (const b of bookings) for (const p of b.payments) {
-      const d = new Date(p.at);
-      if (`${d.getFullYear()}-${d.getMonth()}` === monthKey) rentals += p.amount;
-    }
-    const tix = orders
-      .filter((o) => {
-        const d = new Date(o.at);
-        return !o.refunded && `${d.getFullYear()}-${d.getMonth()}` === monthKey;
-      })
-      .reduce((s, o) => s + o.subtotal, 0);
-    return { rentals, tix };
-  }, [bookings, orders, monthKey]);
-
+  // Only the things that need a decision from the owner.
+  const todo = [
+    ...bookings.filter((b) => b.status === 'inquiry').map((b) => ({ b, why: 'New request', color: C.blue })),
+    ...bookings.filter((b) => b.status === 'awaiting_deposit').map((b) => ({ b, why: `Waiting on ${money(b.quote.depositDue)} deposit`, color: C.warn })),
+    ...bookings
+      .filter((b) => b.status === 'confirmed' && outstanding(b) > 0 && new Date(b.quote.balanceDueDate) < now)
+      .map((b) => ({ b, why: `${money(outstanding(b))} overdue`, color: C.danger })),
+  ];
+  const upcoming = agenda.filter((a) => new Date(a.end) >= now).slice(0, 4);
   const nextShow = performances.filter((p) => new Date(p.start) > now).sort((a, b) => a.start.localeCompare(b.start))[0];
-  const nextSales = nextShow ? salesSummary(nextShow.seats, now) : null;
-  const owed = balancesDue.reduce((s, b) => s + outstanding(b), 0);
 
   return (
     <Screen>
-      <Hero greeting={`Welcome back${user.name === 'Theatre Owner' ? '' : ', ' + user.name.split(' ')[0]}`} />
+      <Greeting />
+      <Shortcuts
+        items={[
+          { icon: 'add', label: 'Booking', onPress: () => router.push('/booking/new') },
+          { icon: 'musical-notes', label: 'Rehearsal', color: C.purple, onPress: () => router.push('/rehearsal/edit') },
+          { icon: 'ticket', label: 'Box office', color: C.curtain, onPress: () => router.push('/tickets') },
+          { icon: 'qr-code', label: 'Check-in', color: C.green, onPress: () => (nextShow ? router.push(`/checkin/${nextShow.id}`) : router.push('/tickets')) },
+        ]}
+      />
 
-      {(requests.length > 0 || awaiting.length > 0 || overdue.length > 0) && (
-        <Card accent={C.gold}>
-          <Txt v="label" color={C.gold}>Needs your attention</Txt>
-          {requests.map((b) => (
-            <ListItem key={b.id} icon="mail-unread" iconColor={C.blue} title={b.title} subtitle={`New request · ${fmtRange(b.start, b.end)}`} onPress={() => router.push(`/booking/${b.id}`)} />
-          ))}
-          {awaiting.map((b) => (
-            <ListItem key={b.id} icon="hourglass" iconColor={C.warn} title={b.title} subtitle={`Waiting on ${money(b.quote.depositDue)} deposit${b.holdExpiresAt ? ` · hold ends ${relativeDay(b.holdExpiresAt)}` : ''}`} onPress={() => router.push(`/booking/${b.id}`)} />
-          ))}
-          {overdue.map((b) => (
-            <ListItem key={b.id} icon="alert-circle" iconColor={C.danger} title={b.title} subtitle={`Balance ${money(outstanding(b))} overdue`} onPress={() => router.push(`/booking/${b.id}`)} />
-          ))}
+      <SectionHeader title={todo.length ? `Needs you · ${todo.length}` : 'Needs you'} action={todo.length > 3 ? 'See all' : undefined} onAction={() => router.push('/rentals')} />
+      {todo.length === 0 ? (
+        <Card>
+          <Txt v="muted">You’re all caught up.</Txt>
         </Card>
+      ) : (
+        <Group>
+          {todo.slice(0, 3).map(({ b, why, color }) => (
+            <Line key={b.id} dot={color} title={b.title} detail={`${why} · ${fmtDate(b.start)}`} onPress={() => router.push(`/booking/${b.id}`)} />
+          ))}
+        </Group>
       )}
 
-      <Row style={{ flexWrap: 'wrap' }} gap={12}>
-        <Stat icon="cash-outline" label="Collected this month" value={money(collected.rentals + collected.tix)} sub={`${money(collected.rentals)} rentals · ${money(collected.tix)} tickets`} color={C.green} />
-        <Stat icon="receipt-outline" label="Balances owed" value={money(owed)} sub={`${balancesDue.length} confirmed booking${balancesDue.length === 1 ? '' : 's'}`} color={owed ? C.warn : C.text} />
-      </Row>
-
-      {nextShow && nextSales && (
-        <Card onPress={() => router.push(`/performance/${nextShow.id}`)}>
-          <Row>
-            <Txt v="label">Next show on sale</Txt>
-            <View style={{ flex: 1 }} />
-            <Pill label={relativeDay(nextShow.start)} color={C.curtain} bg={C.curtain + '22'} />
-          </Row>
-          <Txt v="h2">{nextShow.title}</Txt>
-          <Txt v="muted">{`${fmtDate(nextShow.start, { weekday: true })} · ${fmtTime(nextShow.start)}${nextShow.subtitle ? ' · ' + nextShow.subtitle : ''}`}</Txt>
-          <ProgressBar value={(nextSales.sold + nextSales.comp) / nextSales.sellable} color={C.curtain} />
-          <Txt v="small">{`${nextSales.sold + nextSales.comp} of ${nextSales.sellable} seats sold · ${nextSales.available} left`}</Txt>
-        </Card>
+      <SectionHeader title="Coming up" action="Calendar" onAction={() => router.push('/calendar')} />
+      {upcoming.length ? (
+        <Group>
+          {upcoming.map((a) => (
+            <Line
+              key={a.id + a.start}
+              dot={KIND_COLOR[a.kind]}
+              title={a.title}
+              detail={`${relativeDay(a.start)} · ${fmtTime(a.start)}`}
+              onPress={a.href ? () => router.push(a.href as Href) : undefined}
+            />
+          ))}
+        </Group>
+      ) : (
+        <Empty icon="calendar-outline" title="Nothing scheduled" />
       )}
-
-      <SectionHeader title="Quick actions" />
-      <Row style={{ flexWrap: 'wrap' }} gap={12}>
-        <QuickAction icon="add-circle" label="New booking" onPress={() => router.push('/booking/new')} />
-        <QuickAction icon="musical-notes" label="Schedule rehearsal" color={C.purple} onPress={() => router.push('/rehearsal/edit')} />
-      </Row>
-      <Row style={{ flexWrap: 'wrap' }} gap={12}>
-        <QuickAction icon="storefront" label="Box office" color={C.curtain} onPress={() => router.push('/tickets')} />
-        <QuickAction icon="qr-code" label="Door check-in" color={C.green} onPress={() => nextShow ? router.push(`/checkin/${nextShow.id}`) : router.push('/tickets')} />
-      </Row>
-      <Row style={{ flexWrap: 'wrap' }} gap={12}>
-        <QuickAction icon="settings" label="Admin portal" color={C.blue} onPress={() => router.push('/admin')} />
-      </Row>
-
-      <SectionHeader title="Coming up" action="Full calendar" onAction={() => router.push('/calendar')} />
-      {upcoming.length ? upcoming.map((a) => <AgendaRow key={a.id + a.start} item={a} />) : <Empty icon="calendar-outline" title="Nothing scheduled" />}
+      <GetTheAppLink />
     </Screen>
   );
 }
 
+/** On the website only: one quiet link to the phone app. */
+function GetTheAppLink() {
+  if (Platform.OS !== 'web' || !APK_URL) return null;
+  return <Button variant="ghost" icon="logo-android" title="Get the Android app" onPress={() => Linking.openURL(APK_URL)} />;
+}
+
 function RenterHome() {
   const user = useCurrentUser();
-  const venue = useStore((s) => s.venue);
   const bookings = useStore((s) => s.bookings);
   const performances = useStore((s) => s.performances);
-  const mine = bookings.filter((b) => b.renterId === user.id).sort((a, b) => a.start.localeCompare(b.start));
-  const now = new Date();
-  const upcomingShows = performances.filter((p) => p.onSale && new Date(p.start) > now).slice(0, 3);
+  const venue = useStore((s) => s.venue);
+  const mine = bookings
+    .filter((b) => b.renterId === user.id && !['cancelled', 'declined'].includes(b.status) && new Date(b.end) > new Date())
+    .sort((a, b) => a.start.localeCompare(b.start));
+  const shows = performances.filter((p) => p.onSale && new Date(p.start) > new Date()).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 3);
+  const owed = mine.find((b) => b.status === 'awaiting_deposit');
 
   return (
     <Screen>
-      <Hero greeting={`Hi, ${user.name.split(' ')[0]}`} />
-      <Card accent={C.gold}>
-        <Txt v="h2">Host your next event here</Txt>
-        <Txt v="muted">Check open dates, get an instant quote and reserve the stage with a deposit — right from your phone.</Txt>
-        <Button title="Check dates & get a quote" icon="calendar" onPress={() => router.push('/booking/new')} />
-      </Card>
+      <Greeting name={user.name.split(' ')[0]} tagline />
 
-      <SectionHeader title="Your bookings" action="See all" onAction={() => router.push('/rentals')} />
-      {mine.length === 0 && <Empty icon="key-outline" title="No bookings yet" body="Your requests and reservations will show up here." />}
-      {mine.map((b) => {
-        const meta = STATUS_META[b.status];
-        const due = outstanding(b);
-        return (
-          <Card key={b.id} onPress={() => router.push(`/booking/${b.id}`)} accent={meta.color}>
-            <Row>
-              <Pill label={meta.label} color={meta.color} bg={meta.bg} />
-              <View style={{ flex: 1 }} />
-              {due > 0 && b.status !== 'cancelled' && b.status !== 'declined' ? <Txt v="small" color={C.warn}>{`${money(due)} due`}</Txt> : <Txt v="small" color={C.green}>{`Paid ${money(amountPaid(b))}`}</Txt>}
-            </Row>
-            <Txt v="h3">{b.title}</Txt>
-            <Txt v="muted">{fmtRange(b.start, b.end)}</Txt>
-            {b.status === 'awaiting_deposit' && (
-              <Button title={`Pay ${money(b.quote.depositDue)} deposit to lock the date`} small onPress={() => router.push(`/pay?bookingId=${b.id}&kind=deposit` as Href)} />
-            )}
-          </Card>
-        );
-      })}
+      {owed ? (
+        <Card accent={C.warn}>
+          <Txt v="h3">{`Lock in ${fmtDate(owed.start)}`}</Txt>
+          <Txt v="small">{`${owed.title} is held for you until you pay the deposit.`}</Txt>
+          <Button title={`Pay ${money(owed.quote.depositDue)} deposit`} onPress={() => router.push(`/pay?bookingId=${owed.id}&kind=deposit` as Href)} />
+        </Card>
+      ) : (
+        <Card>
+          <Txt v="h3">Host your event here</Txt>
+          <Txt v="small">See open dates and get an instant quote.</Txt>
+          <Button title="Check dates" icon="calendar" onPress={() => router.push('/booking/new')} />
+        </Card>
+      )}
 
-      <SectionHeader title="On stage soon" action="Tickets" onAction={() => router.push('/tickets')} />
-      {upcomingShows.map((p) => (
-        <ListItem key={p.id} icon="ticket" iconColor={C.curtain} title={p.title} subtitle={`${fmtDate(p.start, { weekday: true })} · ${fmtTime(p.start)}`} onPress={() => router.push(`/performance/${p.id}`)} />
-      ))}
+      {mine.length > 0 && (
+        <>
+          <SectionHeader title="Your bookings" action="All" onAction={() => router.push('/rentals')} />
+          <Group>
+            {mine.slice(0, 3).map((b) => (
+              <Line key={b.id} dot={STATUS_META[b.status].color} title={b.title} detail={`${fmtDate(b.start, { weekday: true })} · ${STATUS_META[b.status].label}`} onPress={() => router.push(`/booking/${b.id}`)} />
+            ))}
+          </Group>
+        </>
+      )}
 
-      <SectionHeader title="Contact the theatre" />
-      <Card>
-        <ListItem icon="call" title={venue.phone} subtitle="Call the box office" onPress={() => Linking.openURL(`tel:${venue.phone.replace(/\D/g, '')}`)} />
-        <ListItem icon="mail" title={venue.email} subtitle="Email us" onPress={() => Linking.openURL(`mailto:${venue.email}`)} />
-        <ListItem icon="location" title="Get directions" subtitle={venue.address} onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(venue.address)}`)} />
-      </Card>
+      {shows.length > 0 && (
+        <>
+          <SectionHeader title="On stage soon" action="Tickets" onAction={() => router.push('/tickets')} />
+          <Group>
+            {shows.map((p) => (
+              <Line key={p.id} dot={C.curtain} title={p.title} detail={`${fmtDate(p.start, { weekday: true })} · ${fmtTime(p.start)}`} onPress={() => router.push(`/performance/${p.id}`)} />
+            ))}
+          </Group>
+        </>
+      )}
+
+      <Row style={{ justifyContent: 'center' }} gap={24}>
+        <Button variant="ghost" small icon="call" title="Call" onPress={() => Linking.openURL(`tel:${venue.phone.replace(/\D/g, '')}`)} />
+        <Button variant="ghost" small icon="mail" title="Email" onPress={() => Linking.openURL(`mailto:${venue.email}`)} />
+        <Button variant="ghost" small icon="navigate" title="Directions" onPress={() => Linking.openURL(`https://maps.google.com/?q=${encodeURIComponent(venue.address)}`)} />
+      </Row>
+      <GetTheAppLink />
     </Screen>
   );
 }
@@ -199,72 +168,69 @@ function MemberHome() {
   const channels = useStore((s) => s.channels);
   const messages = useStore((s) => s.messages);
   const lastRead = useStore((s) => s.lastRead);
-  const tickets = useStore((s) => s.tickets);
-  const orders = useStore((s) => s.orders);
   const rsvp = useStore((s) => s.rsvp);
   const now = new Date();
 
   const myProds = productions.filter((p) => p.members.some((m) => m.userId === user.id));
-  const myCalls = schedule
+  const calls = schedule
     .filter((s) => new Date(s.end) > now)
     .filter((s) => {
       const p = myProds.find((x) => x.id === s.productionId);
       return p && isCalled(s, p, user.id);
     })
     .sort((a, b) => a.start.localeCompare(b.start));
-  const next = myCalls[0];
-  const needsRsvp = myCalls.filter((s) => !s.rsvps[user.id]).length;
-
-  const myChannelIds = channels
-    .filter((c) => myProds.some((p) => p.id === c.productionId))
-    .filter((c) => {
-      const p = myProds.find((x) => x.id === c.productionId)!;
-      const m = p.members.find((x) => x.userId === user.id)!;
-      if (c.kind === 'direct') return c.memberIds?.includes(user.id);
-      return !c.groupId || m.groupIds.includes(c.groupId) || m.isDirector;
-    })
-    .map((c) => c.id);
-  const unread = messages.filter((m) => myChannelIds.includes(m.channelId) && m.userId !== user.id && m.at > (lastRead[`${user.id}:${m.channelId}`] ?? '')).length;
-  const announcements = messages.filter((m) => channels.find((c) => c.id === m.channelId)?.kind === 'announcements' && myChannelIds.includes(m.channelId)).slice(-2).reverse();
-  const myOrders = orders.filter((o) => o.buyerUserId === user.id).map((o) => o.id);
-  const myTickets = tickets.filter((t) => myOrders.includes(t.orderId) && !t.void);
+  const next = calls[0];
+  const later = calls.slice(1, 4);
+  const unanswered = calls.filter((c) => !c.rsvps[user.id]).length;
 
   return (
     <Screen>
-      <Hero greeting={`Break a leg, ${user.name.split(' ')[0]}!`} />
+      <Greeting name={user.name.split(' ')[0]} />
+
       {next ? (
         <Card accent={C.purple}>
-          <Txt v="label" color={C.purple}>Your next call</Txt>
+          <Txt v="label" color={C.purple}>{`Next call · ${relativeDay(next.start)}`}</Txt>
           <Txt v="h2">{next.title}</Txt>
-          <Txt v="muted">{`${relativeDay(next.start)} · ${fmtTime(next.start)}–${fmtTime(next.end)} · ${next.space}`}</Txt>
-          {next.notes ? <Txt v="body">{next.notes}</Txt> : null}
+          <Txt v="muted">{`${fmtTime(next.start)}–${fmtTime(next.end)} · ${next.space}`}</Txt>
           <Row>
             {(['yes', 'maybe', 'no'] as const).map((r) => (
-              <Button key={r} small title={r === 'yes' ? "I'll be there" : r === 'maybe' ? 'Maybe' : "Can't make it"} variant={next.rsvps[user.id] === r ? (r === 'no' ? 'danger' : 'success') : 'secondary'} onPress={() => rsvp(next.id, user.id, r)} style={{ flex: 1 }} />
+              <Button
+                key={r}
+                small
+                style={{ flex: 1 }}
+                title={r === 'yes' ? 'Going' : r === 'maybe' ? 'Maybe' : "Can't"}
+                variant={next.rsvps[user.id] === r ? (r === 'no' ? 'danger' : 'success') : 'secondary'}
+                onPress={() => rsvp(next.id, user.id, r)}
+              />
             ))}
           </Row>
         </Card>
       ) : (
         <Empty icon="musical-notes-outline" title="No upcoming calls" />
       )}
-      <Row style={{ flexWrap: 'wrap' }} gap={12}>
-        <Stat icon="chatbubbles-outline" label="Unread messages" value={String(unread)} color={unread ? C.gold : C.text} />
-        <Stat icon="checkmark-done-outline" label="Need your RSVP" value={String(needsRsvp)} color={needsRsvp ? C.warn : C.text} />
-      </Row>
-      {myProds.map((p) => (
-        <Button key={p.id} variant="secondary" icon="people" title={`Open ${p.title} hub`} onPress={() => router.push(`/production/${p.id}`)} />
-      ))}
-      {announcements.length > 0 && <SectionHeader title="Latest announcements" />}
-      {announcements.map((m) => (
-        <Card key={m.id} accent={C.gold}>
-          <Txt v="small">{fmtDate(m.at, { weekday: true })}</Txt>
-          <Txt>{m.text}</Txt>
-        </Card>
-      ))}
-      {myTickets.length > 0 && <SectionHeader title="Your tickets" action="View" onAction={() => router.push('/tickets')} />}
-      {myTickets.slice(0, 3).map((t) => (
-        <ListItem key={t.id} icon="ticket" iconColor={C.curtain} title={t.seatId} subtitle={t.code} onPress={() => router.push(`/ticket/${t.id}`)} />
-      ))}
+
+      {myProds.map((p) => {
+        const ids = channels.filter((c) => c.productionId === p.id).map((c) => c.id);
+        const unread = messages.filter((m) => ids.includes(m.channelId) && m.userId !== user.id && m.at > (lastRead[`${user.id}:${m.channelId}`] ?? '')).length;
+        return (
+          <Group key={p.id}>
+            <Line title={p.title} detail={[unread ? `${unread} unread` : 'Schedule, cast & chat', unanswered ? `${unanswered} to RSVP` : ''].filter(Boolean).join(' · ')} valueColor={C.gold} value={unread ? '●' : undefined} onPress={() => router.push(`/production/${p.id}`)} />
+          </Group>
+        );
+      })}
+
+      {later.length > 0 && (
+        <>
+          <SectionHeader title="After that" />
+          <Group>
+            {later.map((s) => (
+              <Line key={s.id} dot={C.purple} title={s.title} detail={`${relativeDay(s.start)} · ${fmtTime(s.start)}`} value={s.rsvps[user.id] ? undefined : 'RSVP'} valueColor={C.warn} onPress={() => router.push(`/production/${s.productionId}?item=${s.id}` as Href)} />
+            ))}
+          </Group>
+        </>
+      )}
+      <GetTheAppLink />
     </Screen>
   );
 }
+

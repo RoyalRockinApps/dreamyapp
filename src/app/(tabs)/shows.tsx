@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import { View } from 'react-native';
 
 import { Button, Card, Empty, Pill, Row, Screen, Txt } from '@/components/ui';
 import { useChannels } from '@/hooks/useChannels';
@@ -47,21 +46,11 @@ function ProductionCard({ p }: { p: Production }) {
   return (
     <Card onPress={() => router.push(`/production/${p.id}`)} accent={p.color}>
       <Row>
-        {daysToOpen > 0 ? <Pill label={`Opens in ${daysToOpen} days`} color={p.color} bg={p.color + '22'} /> : <Pill label="Running / closed" />}
-        <View style={{ flex: 1 }} />
-        {unread > 0 && <Pill icon="chatbubble" label={`${unread} new`} color={C.gold} bg={C.goldSoft} />}
+        <Txt v="h2" style={{ flex: 1 }}>{p.title}</Txt>
+        {unread > 0 && <Pill icon="chatbubble" label={String(unread)} color={C.gold} bg={C.goldSoft} />}
       </Row>
-      <Txt v="h1">{p.title}</Txt>
-      {p.tagline ? <Txt v="muted" style={{ fontStyle: 'italic' }}>{p.tagline}</Txt> : null}
-      <Txt v="small">{`${fmtDate(p.openingDate)} – ${fmtDate(p.closingDate, { year: true })} · ${p.members.length} in company · ${p.groups.length} groups`}</Txt>
-      {me?.part ? <Txt v="small" color={C.gold}>{`You: ${me.part}`}</Txt> : null}
-      {next && (
-        <View style={{ backgroundColor: C.surface2, borderRadius: 10, padding: 10, gap: 2 }}>
-          <Txt v="label">Next call</Txt>
-          <Txt v="h3">{next.title}</Txt>
-          <Txt v="small">{`${relativeDay(next.start)} · ${fmtTime(next.start)}–${fmtTime(next.end)} · ${next.space}`}</Txt>
-        </View>
-      )}
+      <Txt v="small">{[daysToOpen > 0 ? `Opens in ${daysToOpen} days` : `${fmtDate(p.openingDate)} – ${fmtDate(p.closingDate)}`, me?.part && !me.isDirector ? `You: ${me.part}` : ''].filter(Boolean).join(' · ')}</Txt>
+      {next && <Txt v="small" color={C.purple}>{`Next: ${next.title} · ${relativeDay(next.start)} ${fmtTime(next.start)}`}</Txt>}
     </Card>
   );
 }

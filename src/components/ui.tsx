@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import type { ComponentProps, ReactNode } from 'react';
+import { Children, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -28,7 +28,7 @@ export function Screen({ children, padded = true, style }: { children: ReactNode
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={[padded && { padding: SP.lg, gap: SP.md, paddingBottom: 48, width: '100%', maxWidth: 880, alignSelf: 'center' }, style]}
+      contentContainerStyle={[padded && { padding: SP.lg, gap: SP.lg, paddingBottom: 56, width: '100%', maxWidth: 880, alignSelf: 'center' }, style]}
       keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
@@ -186,7 +186,7 @@ export function Stat({ label, value, sub, color = C.text, icon }: { label: strin
 
 export function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
-    <Row style={{ marginTop: SP.md }}>
+    <Row style={{ marginTop: SP.sm, marginBottom: -SP.xs }}>
       <Txt v="label">{title}</Txt>
       <Spacer />
       {action && onAction ? (
@@ -366,3 +366,78 @@ export const styles = StyleSheet.create({
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: R.sm },
   listItem: { flexDirection: 'row', alignItems: 'center', gap: SP.md, paddingVertical: 10 },
 });
+
+/** A titled section whose body is hidden until tapped. Keeps secondary detail out of the way. */
+export function Collapsible({ title, subtitle, children, defaultOpen = false, icon }: { title: string; subtitle?: string; children: ReactNode; defaultOpen?: boolean; icon?: IconName }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={() => {
+          tap();
+          setOpen(!open);
+        }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        {icon && <Ionicons name={icon} size={18} color={C.muted} />}
+        <View style={{ flex: 1 }}>
+          <Txt v="h3">{title}</Txt>
+          {subtitle && !open ? <Txt v="small" numberOfLines={1}>{subtitle}</Txt> : null}
+        </View>
+        <Ionicons name={open ? 'chevron-up' : 'chevron-down'} size={18} color={C.faint} />
+      </Pressable>
+      {open ? <View style={{ gap: SP.sm, marginTop: SP.xs }}>{children}</View> : null}
+    </View>
+  );
+}
+
+/** One card holding a list of rows separated by hairlines. */
+export function Group({ children }: { children: ReactNode }) {
+  const items = Children.toArray(children).filter(Boolean);
+  return (
+    <View style={[styles.card, { paddingVertical: 4, gap: 0 }]}>
+      {items.map((c, i) => (
+        <View key={i} style={i > 0 ? { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border } : undefined}>
+          {c}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+/** Compact two-line row: colored dot, title + one line of detail, short value on the right. */
+export function Line({ title, detail, value, valueColor, dot, onPress }: { title: string; detail?: string; value?: string; valueColor?: string; dot?: string; onPress?: () => void }) {
+  return (
+    <Pressable onPress={onPress} disabled={!onPress} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 }, pressed && { opacity: 0.6 }]}>
+      {dot ? <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: dot }} /> : null}
+      <View style={{ flex: 1, gap: 2 }}>
+        <Txt v="h3" numberOfLines={1}>{title}</Txt>
+        {detail ? <Txt v="small" numberOfLines={1}>{detail}</Txt> : null}
+      </View>
+      {value ? <Txt v="small" color={valueColor ?? C.muted} style={{ fontWeight: '700' }}>{value}</Txt> : null}
+      {onPress ? <Ionicons name="chevron-forward" size={16} color={C.faint} /> : null}
+    </Pressable>
+  );
+}
+
+/** Row of round icon shortcuts. */
+export function Shortcuts({ items }: { items: { icon: IconName; label: string; onPress: () => void; color?: string }[] }) {
+  return (
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+      {items.map((it) => (
+        <Pressable
+          key={it.label}
+          onPress={() => {
+            tap();
+            it.onPress();
+          }}
+          style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 6, opacity: pressed ? 0.6 : 1 })}>
+          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: (it.color ?? C.gold) + '1F', alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name={it.icon} size={22} color={it.color ?? C.gold} />
+          </View>
+          <Text style={{ color: C.muted, fontSize: 12, fontWeight: '600', textAlign: 'center' }}>{it.label}</Text>
+        </Pressable>
+      ))}
+    </View>
+  );
+}

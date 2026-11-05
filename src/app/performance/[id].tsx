@@ -4,8 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { CardForm } from '@/components/CardForm';
-import { SeatMap, TIER_COLOR } from '@/components/SeatMap';
-import { Button, Card, Chips, Divider, Empty, Field, KeyValue, ListItem, Pill, Row, Screen, Segmented, Txt } from '@/components/ui';
+import { SeatMap } from '@/components/SeatMap';
+import { Button, Card, Chips, Divider, Empty, Field, IconButton, KeyValue, ListItem, Row, Screen, Segmented, Txt } from '@/components/ui';
 import { useNow } from '@/hooks/useAgenda';
 import { fmtDate, fmtTime, money } from '@/lib/dates';
 import {
@@ -22,7 +22,7 @@ import {
   TIER_LABEL,
   type Availability,
 } from '@/lib/seating';
-import type { Order, PriceTier, Seat } from '@/lib/types';
+import type { Order, Seat } from '@/lib/types';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 import { alert } from '@/components/alert';
@@ -220,46 +220,37 @@ export default function PerformanceScreen() {
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <Stack.Screen options={{ title: isOwner ? 'Box Office' : 'Choose Seats' }} />
       <Screen>
-        <Card accent={C.curtain}>
-          <Txt v="h2">{p.title}</Txt>
-          {p.subtitle ? <Txt v="muted">{p.subtitle}</Txt> : null}
-          <Txt v="small">{`${fmtDate(p.start, { weekday: true, year: true })} · ${fmtTime(p.start)} · Doors ${fmtTime(new Date(new Date(p.start).getTime() - p.doorsMins * 60000))}`}</Txt>
-          <Row style={{ flexWrap: 'wrap' }}>
-            {(Object.keys(p.prices) as PriceTier[]).map((t) => (
-              <Pill key={t} label={`${TIER_LABEL[t]} ${money(p.prices[t])}`} color={TIER_COLOR[t]} bg={TIER_COLOR[t] + '22'} />
-            ))}
-          </Row>
-          <Txt v="small">{`${stats.available} of ${stats.capacity} seats available`}</Txt>
-        </Card>
+        <Row>
+          <View style={{ flex: 1, gap: 2 }}>
+            <Txt v="h2">{p.title + (p.subtitle ? ` · ${p.subtitle}` : '')}</Txt>
+            <Txt v="small">{`${fmtDate(p.start, { weekday: true })} · ${fmtTime(p.start)} · ${stats.available} seats left`}</Txt>
+          </View>
+          {isOwner && <IconButton icon="qr-code" color={C.gold} onPress={() => router.push(`/checkin/${p.id}`)} />}
+          {isOwner && <IconButton icon={p.onSale ? 'pause-circle' : 'play-circle'} color={p.onSale ? C.muted : C.green} onPress={() => updatePerformance(p.id, { onSale: !p.onSale })} />}
+        </Row>
+        {isOwner && !p.onSale && <Txt v="small" color={C.warn}>Off sale — only the box office can sell seats.</Txt>}
 
         {isPast && <Txt v="muted">This performance has already happened.</Txt>}
         {!p.onSale && !isOwner && <Empty icon="pause-circle-outline" title="Not on sale" body="Check back soon!" />}
 
         {isOwner && (
           <>
-            <Segmented options={['sell', 'comp', 'block'] as const} value={mode} onChange={(m) => { setMode(m); setBlockSel([]); }} labels={{ sell: 'Sell', comp: 'Comp', block: 'Hold back seats' }} />
-            <Row>
-              <Button small style={{ flex: 1 }} variant="secondary" icon={p.onSale ? 'pause' : 'play'} title={p.onSale ? 'Take off sale' : 'Put on sale'} onPress={() => updatePerformance(p.id, { onSale: !p.onSale })} />
-              <Button small style={{ flex: 1 }} variant="secondary" icon="qr-code" title="Door check-in" onPress={() => router.push(`/checkin/${p.id}`)} />
-            </Row>
+            <Segmented options={['sell', 'comp', 'block'] as const} value={mode} onChange={(m) => { setMode(m); setBlockSel([]); }} labels={{ sell: 'Sell', comp: 'Comp', block: 'Hold back' }} />
           </>
         )}
 
         {(p.onSale || isOwner) && !isPast && (
           <>
             {mode !== 'block' && (
-              <Card>
-                <Txt v="label">Best available</Txt>
-                <Row>
-                  <View style={{ flex: 1 }}>
-                    <Chips options={['1', '2', '3', '4', '5', '6']} value={count} onChange={setCount} />
-                  </View>
-                </Row>
-                <Button small variant="secondary" icon="sparkles" title={`Find ${count} seat${count === '1' ? '' : 's'} together`} onPress={pickBest} />
-              </Card>
+              <Row>
+                <Txt v="muted" style={{ flex: 1 }}>Best seats together</Txt>
+                <IconButton icon="remove-circle-outline" color={C.gold} onPress={() => setCount(String(Math.max(1, Number(count) - 1)))} />
+                <Txt v="h3" style={{ minWidth: 20, textAlign: 'center' }}>{count}</Txt>
+                <IconButton icon="add-circle-outline" color={C.gold} onPress={() => setCount(String(Math.min(MAX_SEATS, Number(count) + 1)))} />
+                <Button small icon="sparkles" title="Find" onPress={pickBest} />
+              </Row>
             )}
-            <SeatMap claims={p.seats} holderId={user.id} selected={mode === 'block' ? blockSel : mine} onToggle={onSeat} manage={isOwner} now={now} />
-            {mode !== 'block' && <Txt v="small">Tap a seat to add it. Accessible spaces (♿) can also be booked through the box office.</Txt>}
+            <SeatMap claims={p.seats} holderId={user.id} selected={mode === 'block' ? blockSel : mine} onToggle={onSeat} manage={isOwner} now={now} prices={p.prices} />
           </>
         )}
       </Screen>
