@@ -54,9 +54,18 @@ jobs:
       - run: npx expo prebuild --platform android --no-install
       - name: Build release APK
         working-directory: android
+        env:
+          GRADLE_OPTS: -Dorg.gradle.internal.http.connectionTimeout=120000 -Dorg.gradle.internal.http.socketTimeout=120000
         # Release builds are signed with the template's debug key: fine for sideloading demos.
         # For Google Play, build an AAB with your own upload key via EAS (see README).
-        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64
+        # Retries ride out transient Maven/GitHub download timeouts (504s happen).
+        run: |
+          for attempt in 1 2 3; do
+            ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64 && exit 0
+            echo "::warning::Gradle attempt $attempt failed; retrying in 30s"
+            sleep 30
+          done
+          exit 1
       - name: Collect APK
         run: |
           mkdir -p dist-apk
