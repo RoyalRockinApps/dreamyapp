@@ -1,18 +1,40 @@
 import type { PriceTier, Seat, SeatClaim } from './types';
 
+export type SectionId = 'L' | 'C' | 'R';
+
+export interface HouseConfig {
+  rows: string[];
+  sectionWidths: Record<SectionId, number>;
+  premiumRows: string[];
+  valueRows: string[];
+  /** wheelchair-accessible spaces (with companion seats beside them) */
+  accessibleSeats: string[];
+}
+
 /**
- * House layout for the main auditorium (former Butler High School Theatre).
- * Three orchestra sections (house-left, center, house-right) split by two aisles.
- * The owner can tune rows/section widths here to match the real seat chart.
+ * Default layout for the main auditorium (former Butler High School Theatre):
+ * three orchestra sections (house-left, center, house-right) split by two aisles.
+ * The owner edits this in Admin → Seating to match the real seat chart.
  */
-export const HOUSE = {
+export const DEFAULT_HOUSE: HouseConfig = {
   rows: 'ABCDEFGHIJKLMNOP'.split(''),
-  sectionWidths: { L: 7, C: 14, R: 7 } as Record<'L' | 'C' | 'R', number>,
+  sectionWidths: { L: 7, C: 14, R: 7 },
   premiumRows: ['C', 'D', 'E', 'F', 'G', 'H'],
   valueRows: ['N', 'O', 'P'],
-  /** wheelchair-accessible spaces (with companion seats beside them) */
   accessibleSeats: ['P-C1', 'P-C2', 'P-C13', 'P-C14', 'P-L1', 'P-R7'],
 };
+
+let house: HouseConfig = DEFAULT_HOUSE;
+
+export function getHouse(): HouseConfig {
+  return house;
+}
+
+/** Swap the active house layout (called by the store when the owner saves a new layout). */
+export function configureHouse(h: HouseConfig) {
+  house = h;
+  cachedLayout = null;
+}
 
 export const TIER_LABEL: Record<PriceTier, string> = {
   premium: 'Premium',
@@ -26,7 +48,12 @@ export const HOLD_MINUTES = 8;
 let cachedLayout: Seat[] | null = null;
 
 export function buildLayout(): Seat[] {
-  if (cachedLayout) return cachedLayout;
+  if (!cachedLayout) cachedLayout = layoutFor(house);
+  return cachedLayout;
+}
+
+/** Pure layout builder, also used to preview a layout before saving it. */
+export function layoutFor(HOUSE: HouseConfig): Seat[] {
   const seats: Seat[] = [];
   for (const row of HOUSE.rows) {
     for (const section of ['L', 'C', 'R'] as const) {
@@ -43,8 +70,15 @@ export function buildLayout(): Seat[] {
       }
     }
   }
-  cachedLayout = seats;
   return seats;
+}
+
+/** Seat ids with live claims (sold, comp, blocked) that would disappear under layout `h`. */
+export function claimsOutside(h: HouseConfig, claims: Record<string, SeatClaim>[]): string[] {
+  const ids = new Set(layoutFor(h).map((s) => s.id));
+  const out = new Set<string>();
+  for (const c of claims) for (const [id, claim] of Object.entries(c)) if (claim.status !== 'held' && !ids.has(id)) out.add(id);
+  return [...out];
 }
 
 export function seatById(id: string): Seat | undefined {
@@ -216,7 +250,8 @@ export function bestAvailable(
   opts: { tier?: PriceTier; accessible?: boolean } = {},
 ): string[] | null {
   const layout = buildLayout();
-  const sweetRow = HOUSE.rows.indexOf('F');
+  const HOUSE = house;
+  const sweetRow = Math.min(HOUSE.rows.length - 1, Math.round(HOUSE.rows.length * 0.33));
   let best: { ids: string[]; score: number } | null = null;
   for (const row of HOUSE.rows) {
     for (const section of ['C', 'L', 'R'] as const) {

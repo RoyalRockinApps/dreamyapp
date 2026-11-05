@@ -45,6 +45,7 @@ export default function RootLayout() {
         <Stack.Screen name="ticket/[id]" options={{ title: 'Your Ticket' }} />
         <Stack.Screen name="checkin/[id]" options={{ title: 'Door Check-in' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="admin" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );

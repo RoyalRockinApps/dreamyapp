@@ -1,11 +1,12 @@
 import { router, type Href } from 'expo-router';
 import { useMemo } from 'react';
-import { Linking, Pressable, View } from 'react-native';
+import { Linking, Platform, Pressable, View } from 'react-native';
 
 import { AgendaRow } from '@/components/AgendaRow';
 import { Button, Card, Empty, ListItem, Pill, ProgressBar, Row, Screen, SectionHeader, Stat, Txt, type IconName } from '@/components/ui';
 import { useAgenda } from '@/hooks/useAgenda';
 import { fmtDate, fmtRange, fmtTime, money, relativeDay, WEEKDAYS, MONTHS } from '@/lib/dates';
+import { APK_URL } from '@/lib/links';
 import { amountPaid, outstanding } from '@/lib/pricing';
 import { isCalled } from '@/lib/scheduling';
 import { salesSummary } from '@/lib/seating';
@@ -27,6 +28,11 @@ function Hero({ greeting }: { greeting: string }) {
       <Txt v="label" color={C.gold}>{`${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`}</Txt>
       <Txt v="display">{greeting}</Txt>
       <Txt v="muted" style={{ fontStyle: 'italic' }}>{venue.tagline}</Txt>
+      {Platform.OS === 'web' && APK_URL ? (
+        <Card style={{ marginTop: 8, paddingVertical: 10 }}>
+          <ListItem icon="logo-android" iconColor={C.green} title="Get the Android app" subtitle="Same features, on your phone — download the APK" onPress={() => Linking.openURL(APK_URL)} />
+        </Card>
+      ) : null}
     </View>
   );
 }
@@ -121,6 +127,9 @@ function OwnerHome() {
       <Row style={{ flexWrap: 'wrap' }} gap={12}>
         <QuickAction icon="storefront" label="Box office" color={C.curtain} onPress={() => router.push('/tickets')} />
         <QuickAction icon="qr-code" label="Door check-in" color={C.green} onPress={() => nextShow ? router.push(`/checkin/${nextShow.id}`) : router.push('/tickets')} />
+      </Row>
+      <Row style={{ flexWrap: 'wrap' }} gap={12}>
+        <QuickAction icon="settings" label="Admin portal" color={C.blue} onPress={() => router.push('/admin')} />
       </Row>
 
       <SectionHeader title="Coming up" action="Full calendar" onAction={() => router.push('/calendar')} />

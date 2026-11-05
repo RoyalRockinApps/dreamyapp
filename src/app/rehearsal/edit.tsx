@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Text, View } from 'react-native';
+import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { Button, Card, Chips, Empty, Field, Row, Screen, SectionHeader, Txt, tap } from '@/components/ui';
@@ -10,6 +10,7 @@ import { findConflicts, memberConflictsFor, stageBusy } from '@/lib/scheduling';
 import { SCHEDULE_KINDS, SPACES, type ScheduleKind, type Space } from '@/lib/types';
 import { useStore } from '@/store/useStore';
 import { C, R } from '@/theme';
+import { alert } from '@/components/alert';
 
 const TIMES = Array.from({ length: 31 }, (_, i) => 7 * 60 + i * 30); // 7:00am – 10:00pm
 const DURATIONS = [60, 90, 120, 150, 180, 240, 300, 480];
@@ -66,8 +67,8 @@ export default function EditCall() {
       upsert({ id: existing?.id, productionId: production.id, title: t, kind, start: o.start.toISOString(), end: o.end.toISOString(), space, groupIds, notes: notes.trim() || undefined });
       created++;
     });
-    if (created === 0) return Alert.alert('Stage is booked', 'That time overlaps another event on the Main Stage. Pick another time or use the Rehearsal Room.');
-    if (blocked > 0) Alert.alert('Scheduled with skips', `${created} call${created > 1 ? 's' : ''} added. ${blocked} week${blocked > 1 ? 's were' : ' was'} skipped because the stage is booked.`);
+    if (created === 0) return alert('Stage is booked', 'That time overlaps another event on the Main Stage. Pick another time or use the Rehearsal Room.');
+    if (blocked > 0) alert('Scheduled with skips', `${created} call${created > 1 ? 's' : ''} added. ${blocked} week${blocked > 1 ? 's were' : ' was'} skipped because the stage is booked.`);
     router.back();
   };
 
@@ -144,7 +145,7 @@ export default function EditCall() {
           variant="danger"
           title="Delete call"
           onPress={() =>
-            Alert.alert('Delete this call?', 'It will be removed from everyone’s schedule.', [
+            alert('Delete this call?', 'It will be removed from everyone’s schedule.', [
               { text: 'Keep', style: 'cancel' },
               { text: 'Delete', style: 'destructive', onPress: () => { remove(existing.id); router.back(); } },
             ])

@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 
 import { CardForm } from '@/components/CardForm';
 import { SeatMap, TIER_COLOR } from '@/components/SeatMap';
@@ -25,6 +25,7 @@ import {
 import type { Order, PriceTier, Seat } from '@/lib/types';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
+import { alert } from '@/components/alert';
 
 const MAX_SEATS = 10;
 type Mode = 'sell' | 'comp' | 'block';
@@ -72,7 +73,7 @@ export default function PerformanceScreen() {
       warnedExpiry.current = true;
       release(id);
       setPhase('pick');
-      Alert.alert('Time’s up', 'Your seats were released so others can buy them. Pick again whenever you’re ready.');
+      alert('Time’s up', 'Your seats were released so others can buy them. Pick again whenever you’re ready.');
     }
     if (secondsLeft > 0) warnedExpiry.current = false;
   }, [secondsLeft, holdExpiry, phase, id, release]);
@@ -88,7 +89,7 @@ export default function PerformanceScreen() {
     try {
       hold(p.id, ids);
     } catch (e) {
-      if (e instanceof SeatUnavailableError) Alert.alert('Seat just taken', e.message);
+      if (e instanceof SeatUnavailableError) alert('Seat just taken', e.message);
       else throw e;
     }
   };
@@ -101,12 +102,12 @@ export default function PerformanceScreen() {
     }
     if (a === 'mine') return release(p.id, [seat.id]);
     if (a === 'available') {
-      if (mine.length >= MAX_SEATS) return Alert.alert(`Limit ${MAX_SEATS} seats per order`);
+      if (mine.length >= MAX_SEATS) return alert(`Limit ${MAX_SEATS} seats per order`);
       return tryHold([seat.id]);
     }
     if (isOwner && a === 'sold') return inspectSold(seat.id);
     if (isOwner && a === 'blocked') {
-      return Alert.alert(`${seatLabel(seat.id)} is held back`, p.seats[seat.id]?.note ?? 'Blocked by the box office', [
+      return alert(`${seatLabel(seat.id)} is held back`, p.seats[seat.id]?.note ?? 'Blocked by the box office', [
         { text: 'Keep blocked', style: 'cancel' },
         { text: 'Release to sale', onPress: () => block(p.id, [seat.id], false) },
       ]);
@@ -116,7 +117,7 @@ export default function PerformanceScreen() {
   const inspectSold = (seatId: string) => {
     const t = tickets.find((x) => x.performanceId === p.id && x.seatId === seatId && !x.void);
     const o = orders.find((x) => x.id === t?.orderId);
-    Alert.alert(seatLabel(seatId), o ? `${o.buyerName}\n${o.buyerEmail}\nTicket ${t?.code}${t?.checkedInAt ? '\nChecked in ✓' : ''}` : 'Sold', [
+    alert(seatLabel(seatId), o ? `${o.buyerName}\n${o.buyerEmail}\nTicket ${t?.code}${t?.checkedInAt ? '\nChecked in ✓' : ''}` : 'Sold', [
       { text: 'Close', style: 'cancel' },
       ...(t && !t.checkedInAt ? [{ text: 'Refund & release seat', style: 'destructive' as const, onPress: () => refundTicket(t.id) }] : []),
     ]);
@@ -126,13 +127,13 @@ export default function PerformanceScreen() {
     const n = Number(count);
     release(p.id);
     const ids = bestAvailable(p.seats, n, user.id, new Date(), { accessible: false });
-    if (!ids) return Alert.alert('No block of seats together', `We couldn't find ${n} seats side by side. Try fewer seats or pick them on the map.`);
+    if (!ids) return alert('No block of seats together', `We couldn't find ${n} seats side by side. Try fewer seats or pick them on the map.`);
     tryHold(ids);
   };
 
   const complete = (method: Order['method']) => {
     if (!buyerName.trim() || !/^\S+@\S+\.\S+$/.test(buyerEmail)) {
-      Alert.alert('Add the buyer’s name and email so we can send the tickets');
+      alert('Add the buyer’s name and email so we can send the tickets');
       return false;
     }
     try {
@@ -142,7 +143,7 @@ export default function PerformanceScreen() {
       return true;
     } catch (e) {
       if (e instanceof SeatUnavailableError) {
-        Alert.alert('Seat no longer available', e.message);
+        alert('Seat no longer available', e.message);
         setPhase('pick');
         return false;
       }

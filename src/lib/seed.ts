@@ -53,6 +53,7 @@ export const DEFAULT_SETTINGS: RentalSettings = {
   balanceDueDays: 14,
   holdHours: 72,
   autoApprove: false,
+  ticketFee: 1.5,
   cancellationPolicy:
     'Reservation deposits are non-refundable within 30 days of the event. Cancellations made 30+ days out receive a 50% refund of the reservation deposit. The security deposit is refunded within 7 days after the event, less any damages or overtime.',
 };

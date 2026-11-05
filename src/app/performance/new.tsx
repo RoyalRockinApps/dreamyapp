@@ -1,6 +1,6 @@
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, Text } from 'react-native';
+import { Pressable, ScrollView, Text } from 'react-native';
 
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { TIER_COLOR } from '@/components/SeatMap';
@@ -10,6 +10,7 @@ import { TIER_LABEL } from '@/lib/seating';
 import type { PriceTier } from '@/lib/types';
 import { useStore } from '@/store/useStore';
 import { C, R } from '@/theme';
+import { alert } from '@/components/alert';
 
 const TIMES = Array.from({ length: 25 }, (_, i) => 10 * 60 + i * 30);
 
@@ -42,9 +43,9 @@ export default function NewPerformance() {
   ];
 
   const save = () => {
-    if (!title.trim()) return Alert.alert('Add a title');
+    if (!title.trim()) return alert('Add a title');
     const parsed = Object.fromEntries(Object.entries(prices).map(([k, v]) => [k, Number(v)])) as Record<PriceTier, number>;
-    if (Object.values(parsed).some((n) => !(n >= 0))) return Alert.alert('Prices must be numbers');
+    if (Object.values(parsed).some((n) => !(n >= 0))) return alert('Prices must be numbers');
     const perf = createPerformance({
       title: title.trim(),
       subtitle: subtitle.trim() || undefined,

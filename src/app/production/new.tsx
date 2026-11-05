@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { Button, Chips, Field, Row, Screen, Txt } from '@/components/ui';
@@ -9,6 +9,7 @@ import { uid } from '@/lib/ids';
 import { OWNER_ID } from '@/lib/seed';
 import { useStore } from '@/store/useStore';
 import { C } from '@/theme';
+import { alert } from '@/components/alert';
 
 const PRESET_GROUPS = ['Leads', 'Ensemble', 'Dance Corps', 'Kids Chorus', 'Tech Crew', 'Pit Band', 'Costumes', 'Front of House'];
 const GROUP_COLORS = ['#E8B04B', '#7FB7BE', '#F08FC0', '#9B8DE3', '#E26D5C', '#5DA9E9', '#82D2A5', '#F2C14E'];
@@ -26,7 +27,7 @@ export default function NewProduction() {
   const [runDays, setRunDays] = useState('3');
 
   const create = () => {
-    if (!title.trim()) return Alert.alert('Give your production a title');
+    if (!title.trim()) return alert('Give your production a title');
     const closing = addDays(atMinutes(opening, 22 * 60), Number(runDays) - 1);
     const p = createProduction({
       title: title.trim(),

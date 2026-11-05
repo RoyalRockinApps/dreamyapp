@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams, type Href } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Linking, Share, View } from 'react-native';
+import { Linking, Share, View } from 'react-native';
 
 import { Button, Card, Chips, Divider, Empty, Field, KeyValue, ListItem, Pill, ProgressBar, Row, Screen, SectionHeader, Txt } from '@/components/ui';
 import { fmtDate, fmtRange, fmtTime, money, relativeDay } from '@/lib/dates';
@@ -8,11 +8,12 @@ import { amountPaid, bookingSummaryText, grandTotal, outstanding } from '@/lib/p
 import type { BookingStatus, PaymentMethod } from '@/lib/types';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C, STATUS_META } from '@/theme';
+import { alert } from '@/components/alert';
 
 const FLOW: BookingStatus[] = ['inquiry', 'awaiting_deposit', 'confirmed', 'completed'];
 
 function confirm(title: string, message: string, onYes: () => void, destructive = false) {
-  Alert.alert(title, message, [
+  alert(title, message, [
     { text: 'Not now', style: 'cancel' },
     { text: 'Yes', style: destructive ? 'destructive' : 'default', onPress: onYes },
   ]);
@@ -50,7 +51,7 @@ export default function BookingDetail() {
 
   const record = () => {
     const n = Number(amount);
-    if (!n || n <= 0) return Alert.alert('Enter an amount');
+    if (!n || n <= 0) return alert('Enter an amount');
     addPayment(b.id, { amount: n, kind: paid < b.quote.depositDue ? 'deposit' : 'balance', method, reference: reference || undefined });
     setRecording(false);
     setAmount('');

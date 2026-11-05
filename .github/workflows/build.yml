@@ -1,0 +1,132 @@
+name: Build app & website
+
+# Every push: checks → Android APK + website.
+# Pushes to the default branch also publish:
+#   • the APK to the rolling "android-latest" GitHub Release (stable download link)
+#   • the website to GitHub Pages
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Inlined into the app at build time so the app links to the website and vice-versa
+  EXPO_PUBLIC_APK_URL: https://github.com/${{ github.repository }}/releases/download/android-latest/dream-theatre.apk
+  EXPO_PUBLIC_WEB_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npx expo lint
+      - run: npm test
+
+  android:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+      - run: npm ci
+      # Generates android/ from app.json (Continuous Native Generation — never committed)
+      - run: npx expo prebuild --platform android --no-install
+      - name: Build release APK
+        working-directory: android
+        # Release builds are signed with the template's debug key: fine for sideloading demos.
+        # For Google Play, build an AAB with your own upload key via EAS (see README).
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a,x86_64
+      - name: Collect APK
+        run: |
+          mkdir -p dist-apk
+          cp android/app/build/outputs/apk/release/app-release.apk dist-apk/dream-theatre.apk
+          ls -lh dist-apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dream-theatre-apk
+          path: dist-apk/dream-theatre.apk
+          retention-days: 30
+
+  publish-apk:
+    needs: android
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dream-theatre-apk
+      - name: Update the "android-latest" release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release delete android-latest --yes --cleanup-tag || true
+          gh release create android-latest dream-theatre.apk \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Android app — latest build" \
+            --notes "Built from ${GITHUB_SHA::7} on $(date -u '+%Y-%m-%d %H:%M UTC').
+
+          Install: open this page on an Android phone, tap **dream-theatre.apk**, then allow installing from your browser when prompted.
+
+          Website: ${{ env.EXPO_PUBLIC_WEB_URL }}"
+
+  web:
+    needs: checks
+    runs-on: ubuntu-latest
+    env:
+      EXPO_BASE_URL: /${{ github.event.repository.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx expo export --platform web --output-dir dist
+      - name: Static-host fixes
+        run: |
+          # GitHub Pages has no rewrites: serve the app for deep links like /booking/123
+          cp dist/index.html dist/404.html
+          # Expo emits an _expo/ folder; make sure nothing treats it as a Jekyll private dir
+          touch dist/.nojekyll
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy-web:
+    needs: web
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4

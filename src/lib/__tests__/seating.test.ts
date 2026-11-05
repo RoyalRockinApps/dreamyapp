@@ -124,3 +124,23 @@ test('order totals and sales summary', () => {
   assert.equal(s.held, 1);
   assert.equal(s.available, s.capacity - 4);
 });
+
+test('house layout is configurable and protects sold seats', async () => {
+  const { claimsOutside, configureHouse, DEFAULT_HOUSE, layoutFor } = await import('../seating');
+  const small = { ...DEFAULT_HOUSE, rows: ['A', 'B', 'C'], sectionWidths: { L: 2, C: 4, R: 2 }, accessibleSeats: ['C-C1'] };
+  assert.equal(layoutFor(small).length, 3 * 8);
+  assert.equal(layoutFor(small).find((s) => s.id === 'C-C1')?.tier, 'accessible');
+  const sold = commitSale({}, ['F-C9'], 'a', 'o', now);
+  assert.deepEqual(claimsOutside(small, [sold]), ['F-C9']);
+  assert.deepEqual(claimsOutside(DEFAULT_HOUSE, [sold]), []);
+  // expired/active holds don't block a layout change
+  assert.deepEqual(claimsOutside(small, [holdSeats({}, ['F-C9'], 'a', now)]), []);
+  configureHouse(small);
+  try {
+    assert.equal(buildLayout().length, 24);
+    assert.throws(() => commitSale({}, ['F-C9'], 'a', 'o', now), SeatUnavailableError);
+  } finally {
+    configureHouse(DEFAULT_HOUSE);
+  }
+  assert.equal(buildLayout().length, 448);
+});

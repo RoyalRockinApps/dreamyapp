@@ -2,7 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, type ScrollViewInstance } from 'react-native';
 
-import { buildLayout, HOUSE, seatAvailability, TIER_LABEL, type Availability } from '@/lib/seating';
+import { getHouse, layoutFor, seatAvailability, TIER_LABEL, type Availability, type HouseConfig } from '@/lib/seating';
+import { useStore } from '@/store/useStore';
 import type { PriceTier, Seat, SeatClaim } from '@/lib/types';
 import { C, R } from '@/theme';
 import { Segmented, tap } from './ui';
@@ -22,12 +23,18 @@ interface Props {
   /** owner mode lets you tap sold/blocked seats to inspect or unblock them */
   manage?: boolean;
   now: Date;
+  /** preview an unsaved layout (admin) */
+  house?: HouseConfig;
+  /** start in whole-house view */
+  initialZoom?: 'fit' | 'zoom';
 }
 
-export function SeatMap({ claims, holderId, selected, onToggle, manage, now }: Props) {
+export function SeatMap({ claims, holderId, selected, onToggle, manage, now, house, initialZoom = 'zoom' }: Props) {
   const { width } = useWindowDimensions();
-  const [zoom, setZoom] = useState<'fit' | 'zoom'>('zoom');
-  const layout = buildLayout();
+  const [zoom, setZoom] = useState<'fit' | 'zoom'>(initialZoom);
+  const savedHouse = useStore((st) => st.house); // re-render when the owner changes the layout
+  const HOUSE = house ?? savedHouse ?? getHouse();
+  const layout = useMemo(() => layoutFor(HOUSE), [HOUSE]);
   const sel = useMemo(() => new Set(selected), [selected]);
   const scroller = useRef<ScrollViewInstance>(null);
   const viewW = useRef(0);

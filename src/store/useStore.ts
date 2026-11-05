@@ -4,7 +4,7 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { uid, ticketCode } from '@/lib/ids';
 import { quoteRental } from '@/lib/pricing';
-import { commitSale, holdSeats, orderTotals, priceFor, releaseHolds, releaseSeats, setBlocked } from '@/lib/seating';
+import { claimsOutside, commitSale, configureHouse, DEFAULT_HOUSE, holdSeats, orderTotals, priceFor, releaseHolds, releaseSeats, setBlocked, type HouseConfig } from '@/lib/seating';
 import { buildSeed, DEFAULT_SETTINGS, OWNER_ID, VENUE } from '@/lib/seed';
 import type {
   Booking,
@@ -42,8 +42,22 @@ export interface AppState {
   performances: Performance[];
   orders: Order[];
   tickets: Ticket[];
+  house: HouseConfig;
+  /** demo owner sign-in for the admin portal (real auth arrives with the backend) */
+  adminPin: string;
+  /** admin setup checklist: sections the owner has reviewed & saved */
+  setup: Record<string, boolean>;
+  markSetup(key: string): void;
 
   switchUser(id: string): void;
+  updateHouse(h: HouseConfig): void; // throws if sold/blocked seats would vanish
+  setAdminPin(pin: string): void;
+  addUser(u: Omit<User, 'id' | 'color'>): User;
+  updateUser(id: string, patch: Partial<Omit<User, 'id'>>): void;
+  removeUser(id: string): void;
+  deletePerformance(id: string): void; // throws if tickets were sold
+  exportData(): string;
+  importData(json: string): void; // throws on invalid data
   resetDemo(): void;
   updateVenue(v: Partial<VenueInfo>): void;
   updateSettings(s: Partial<RentalSettings>): void;
@@ -88,6 +102,9 @@ function fresh() {
     venue: VENUE,
     settings: DEFAULT_SETTINGS,
     lastRead: {} as Record<string, string>,
+    house: DEFAULT_HOUSE,
+    adminPin: '2020',
+    setup: {} as Record<string, boolean>,
     ...seed,
   };
 }
@@ -103,7 +120,46 @@ export const useStore = create<AppState>()(
         ...fresh(),
 
         switchUser: (id) => set({ currentUserId: id }),
-        resetDemo: () => set({ ...fresh() }),
+        resetDemo: () => {
+          const f = fresh();
+          configureHouse(f.house);
+          set({ ...f });
+        },
+        updateHouse: (h) => {
+          const lost = claimsOutside(h, get().performances.map((p) => p.seats));
+          if (lost.length) throw new Error(`${lost.length} sold or held-back seat${lost.length > 1 ? 's' : ''} (${lost.slice(0, 6).join(', ')}${lost.length > 6 ? '…' : ''}) would disappear. Refund or release them first.`);
+          configureHouse(h);
+          set({ house: h });
+        },
+        setAdminPin: (pin) => set({ adminPin: pin }),
+        markSetup: (key) => set((s) => ({ setup: { ...s.setup, [key]: true } })),
+        addUser: (u) => {
+          const user: User = { ...u, id: uid('u_'), color: COLORS[get().users.length % COLORS.length] };
+          set((s) => ({ users: [...s.users, user] }));
+          return user;
+        },
+        updateUser: (id, patch) => set((s) => ({ users: s.users.map((u) => (u.id === id ? { ...u, ...patch } : u)) })),
+        removeUser: (id) =>
+          set((s) => ({
+            users: s.users.filter((u) => u.id !== id),
+            productions: s.productions.map((p) => ({ ...p, members: p.members.filter((m) => m.userId !== id) })),
+          })),
+        deletePerformance: (id) => {
+          if (get().tickets.some((t) => t.performanceId === id && !t.void)) throw new Error('Tickets have been sold for this performance. Refund them or take it off sale instead.');
+          set((s) => ({ performances: s.performances.filter((p) => p.id !== id) }));
+        },
+        exportData: () => {
+          const { currentUserId: _c, lastRead: _l, ...data } = pickData(get());
+          return JSON.stringify({ app: 'dream-theatre', version: 1, exportedAt: new Date().toISOString(), data }, null, 2);
+        },
+        importData: (json) => {
+          const parsed = JSON.parse(json);
+          const data = parsed?.data;
+          if (parsed?.app !== 'dream-theatre' || !data || !Array.isArray(data.bookings) || !Array.isArray(data.users) || !data.settings) throw new Error('This file is not a Dream Theatre export.');
+          const house: HouseConfig = data.house ?? DEFAULT_HOUSE;
+          configureHouse(house);
+          set((s) => ({ ...data, house, settings: { ...DEFAULT_SETTINGS, ...data.settings }, currentUserId: data.users.some((u: User) => u.id === s.currentUserId) ? s.currentUserId : OWNER_ID }));
+        },
         updateVenue: (v) => set((s) => ({ venue: { ...s.venue, ...v } })),
         updateSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
 
@@ -229,7 +285,7 @@ export const useStore = create<AppState>()(
           if (!p) throw new Error('Performance not found');
           const orderId = uid('o_');
           const seats = commitSale(p.seats, seatIds, me(), orderId, new Date(), method === 'comp' ? 'comp' : 'sold'); // throws -> nothing changes
-          const totals = method === 'comp' ? { subtotal: 0, fees: 0, total: 0 } : orderTotals(seatIds, p.prices);
+          const totals = method === 'comp' ? { subtotal: 0, fees: 0, total: 0 } : orderTotals(seatIds, p.prices, get().settings.ticketFee);
           const order: Order = { id: orderId, performanceId, seatIds, buyerName: buyer.name, buyerEmail: buyer.email, buyerUserId: me(), ...totals, at: new Date().toISOString(), method };
           const existing = new Set(get().tickets.map((t) => t.code));
           const tickets: Ticket[] = seatIds.map((seatId) => {
@@ -270,9 +326,30 @@ export const useStore = create<AppState>()(
       name: 'dream-theatre-v1',
       storage: createJSONStorage(() => AsyncStorage),
       version: 1,
+      partialize: (s) => pickData(s),
+      // keep new settings fields (added in later versions) when loading older saved data
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<AppState>;
+        return { ...current, ...p, settings: { ...current.settings, ...(p.settings ?? {}) }, house: p.house ?? current.house };
+      },
+      onRehydrateStorage: () => (state) => {
+        if (state?.house) configureHouse(state.house);
+      },
     },
   ),
 );
+
+const DATA_KEYS = [
+  'currentUserId', 'venue', 'settings', 'users', 'bookings', 'productions', 'schedule', 'conflicts',
+  'channels', 'messages', 'lastRead', 'performances', 'orders', 'tickets', 'house', 'adminPin', 'setup',
+] as const;
+type Data = Pick<AppState, (typeof DATA_KEYS)[number]>;
+
+function pickData(s: AppState): Data {
+  const out = {} as Record<string, unknown>;
+  for (const k of DATA_KEYS) out[k] = s[k];
+  return out as Data;
+}
 
 export function useCurrentUser(): User {
   const id = useStore((s) => s.currentUserId);

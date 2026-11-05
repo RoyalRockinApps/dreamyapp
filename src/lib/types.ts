@@ -85,6 +85,8 @@ export interface RentalSettings {
   /** if false, renter requests must be approved by the owner before paying */
   autoApprove: boolean;
   cancellationPolicy: string;
+  /** per-ticket service fee added at checkout */
+  ticketFee: number;
 }
 
 export interface QuoteLine {

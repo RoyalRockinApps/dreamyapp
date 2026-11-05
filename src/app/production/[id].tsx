@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { Avatar, Button, Card, Chips, Empty, Field, ListItem, Pill, ProgressBar, Row, Screen, SectionHeader, Segmented, Txt } from '@/components/ui';
@@ -13,6 +13,7 @@ import { salesSummary } from '@/lib/seating';
 import type { MemberConflict, Production, Rsvp, ScheduleItem } from '@/lib/types';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
+import { alert } from '@/components/alert';
 
 type Tab = 'schedule' | 'company' | 'chat' | 'tickets';
 
@@ -262,7 +263,7 @@ function CompanyTab({ p }: { p: Production }) {
           <Button
             title="Add to company"
             onPress={() => {
-              if (!name.trim()) return Alert.alert('Name is required');
+              if (!name.trim()) return alert('Name is required');
               addMember(p.id, { name: name.trim(), email: email.trim() }, groupIds, part.trim() || undefined);
               setName('');
               setEmail('');

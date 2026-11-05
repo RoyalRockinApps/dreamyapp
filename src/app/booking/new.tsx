@@ -1,7 +1,7 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, useLocalSearchParams, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, Switch, Text, View } from 'react-native';
+import { Pressable, ScrollView, Switch, Text, View } from 'react-native';
 
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { Button, Card, Chips, Divider, Field, KeyValue, Pill, Row, Screen, SectionHeader, Txt, tap } from '@/components/ui';
@@ -12,6 +12,7 @@ import { EVENT_TYPES, type EventType } from '@/lib/types';
 import { useNow } from '@/hooks/useAgenda';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C, R } from '@/theme';
+import { alert } from '@/components/alert';
 
 const STEPS = ['Date & time', 'Event', 'Contact', 'Review'];
 const START_TIMES = Array.from({ length: 29 }, (_, i) => 8 * 60 + i * 30); // 8:00am – 10:00pm
@@ -114,7 +115,7 @@ export default function NewBooking() {
       router.replace(`/pay?bookingId=${b.id}&kind=deposit` as Href);
     } else {
       router.replace(`/booking/${b.id}`);
-      if (!isOwner) Alert.alert('Request sent!', `We'll review "${b.title}" and get back to you shortly. You'll be able to pay the deposit here once it's approved.`);
+      if (!isOwner) alert('Request sent!', `We'll review "${b.title}" and get back to you shortly. You'll be able to pay the deposit here once it's approved.`);
     }
   };
 

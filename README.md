@@ -54,6 +54,22 @@ ships to **iOS, Android** and the web.
   voided and wrong-show tickets are rejected, and a live headcount shows who's inside.
 - Renters who buy the "Box office & ticketing" add-on get their own ticketed performances (e.g. _Nutcracker_).
 
+### 4. Admin portal: where the owners set everything up
+`/admin` on the website (sidebar layout on desktop) or **Settings → Open admin portal** in the app:
+
+| Section | What the owner configures |
+|---|---|
+| Overview | Setup checklist, new requests, balances owed, ticket sales, APK and website links |
+| Venue profile | Name, owner, phone, email, address, tagline |
+| Rates & policy | Hourly rate and minimum, deposit %, security deposit, balance due date, turnover buffer, hold length, auto-approve, cancellation policy, with a live example quote |
+| Packages & add-ons | Add, edit or remove packages (hours and price) and add-ons (flat or hourly) |
+| Seating chart | Rows, seats per section, premium and value rows, wheelchair spaces (tap seats in the live preview). Layouts that would remove a sold seat are blocked. |
+| Shows & tickets | Per-performance prices, on sale/off sale, delete, service fee per ticket |
+| People & access | Owners/staff, renters, cast & crew: add, edit, change role, remove |
+| Data & security | Backup download and restore (to move a setup between devices), reset demo data, change the admin PIN |
+
+Signing in requires the **admin PIN** (demo PIN `2020`; change it in Data & security).
+
 ### Three roles, one app
 Use the profile icon (top right) → **Preview the app as…** to switch personas:
 
@@ -69,6 +85,33 @@ of Ballet's _Nutcracker_), plus a few sample requests. **All prices are placehol
 sets real rates in **Settings → Rental rates & policy**.
 
 ---
+
+## Download the APK & open the website
+
+`.github/workflows/build.yml` runs on every push:
+
+1. **Checks:** typecheck, lint, unit tests.
+2. **Android:** `expo prebuild` + Gradle `assembleRelease` produce an installable APK
+   (downloadable from the run's *Artifacts*).
+3. **Website:** `expo export --platform web` builds the same app for browsers, under `/dreamyapp/`.
+4. On the **default branch** it also publishes:
+   - **APK →** https://github.com/RoyalRockinApps/dreamyapp/releases/download/android-latest/dream-theatre.apk
+     (a rolling *android-latest* release, replaced on every push)
+   - **Website →** https://royalrockinapps.github.io/dreamyapp/ (admin portal at `/dreamyapp/admin`)
+
+**One-time setup for the website:** in GitHub, open **Settings → Pages → Build and deployment → Source** and choose **GitHub Actions**.
+Then re-run the workflow (Actions → *Build app & website* → *Run workflow*).
+
+Installing the APK: open the link on an Android phone and allow "install unknown apps" for the browser
+when prompted. The demo APK is signed with a debug key, which is fine for sideloading. For the Play Store,
+use `npx eas-cli@latest build -p android --profile production` with your own upload key. iOS installs
+go through TestFlight: `npx eas-cli@latest build -p ios` plus an Apple Developer account.
+`eas.json` also has a `preview` profile that builds an APK on Expo's servers.
+
+> **The app and the website run the same code and have the same features.** Until the shared backend
+> in `docs/BACKEND.md` is connected, each phone and each browser keeps **its own copy** of the data.
+> A change made on the website won't show up on a phone yet. To copy a setup between devices, use
+> **Admin → Data & security → Download backup / Restore**.
 
 ## Run it
 

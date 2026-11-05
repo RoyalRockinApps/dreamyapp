@@ -28,7 +28,7 @@ export function Screen({ children, padded = true, style }: { children: ReactNode
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={[padded && { padding: SP.lg, gap: SP.md, paddingBottom: 48 }, style]}
+      contentContainerStyle={[padded && { padding: SP.lg, gap: SP.md, paddingBottom: 48, width: '100%', maxWidth: 880, alignSelf: 'center' }, style]}
       keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
@@ -339,7 +339,7 @@ export function ListItem({
         </View>
       )}
       <View style={{ flex: 1, gap: 2 }}>
-        <Txt v="h3" numberOfLines={1}>{title}</Txt>
+        <Txt v="h3" numberOfLines={2}>{title}</Txt>
         {subtitle ? <Txt v="small" numberOfLines={2}>{subtitle}</Txt> : null}
       </View>
       {right}
