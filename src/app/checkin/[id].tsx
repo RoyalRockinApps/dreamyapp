@@ -9,13 +9,15 @@ import { Button, Card, Empty, Field, ListItem, ProgressBar, Row, Screen, Section
 import { fmtDate, fmtTime } from '@/lib/dates';
 import { normalizeCode } from '@/lib/ids';
 import { seatLabel } from '@/lib/seating';
-import { useStore } from '@/store/useStore';
+import { usePoll } from '@/store/sync';
+import { errorMessage, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
 type Result = { ok: boolean; message: string; seat?: string; name?: string };
 
 export default function CheckIn() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  usePoll(['tickets'], 5000); // a second door scanner's check-ins show up here too
   const perf = useStore((s) => s.performances.find((p) => p.id === id));
   const tickets = useStore((s) => s.tickets);
   const orders = useStore((s) => s.orders);
@@ -30,9 +32,15 @@ export default function CheckIn() {
   const live = tickets.filter((t) => t.performanceId === perf.id && !t.void);
   const inside = live.filter((t) => t.checkedInAt);
 
-  const submit = (raw: string) => {
+  const submit = async (raw: string) => {
     const c = normalizeCode(raw);
-    const r = checkIn(c, perf.id);
+    let r: Awaited<ReturnType<typeof checkIn>>;
+    try {
+      r = await checkIn(c, perf.id);
+    } catch (e) {
+      setResult({ ok: false, message: errorMessage(e) });
+      return;
+    }
     const order = orders.find((o) => o.id === r.ticket?.orderId);
     setResult({ ok: r.ok, message: r.message, seat: r.ticket ? seatLabel(r.ticket.seatId) : undefined, name: order?.buyerName });
     if (Platform.OS !== 'web') Haptics.notificationAsync(r.ok ? Haptics.NotificationFeedbackType.Success : Haptics.NotificationFeedbackType.Error).catch(() => {});

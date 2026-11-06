@@ -22,6 +22,11 @@ env:
   # Inlined into the app at build time so the app links to the website and vice-versa
   EXPO_PUBLIC_APK_URL: https://github.com/${{ github.repository }}/releases/download/android-latest/dream-theatre.apk
   EXPO_PUBLIC_WEB_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+  # Live backend on Neon (repository Settings → Secrets and variables → Actions → Variables).
+  # Public endpoints only; app.config.js passes them to the app. When unset, the APK and website
+  # run the on-device demo.
+  NEON_AUTH_BASE_URL: ${{ vars.NEON_AUTH_BASE_URL }}
+  NEON_DATA_API_URL: ${{ vars.NEON_DATA_API_URL }}
 
 jobs:
   checks:
@@ -36,6 +41,7 @@ jobs:
       - run: npm run typecheck
       - run: npx expo lint
       - run: npm test
+      - run: npm run test:db   # schema, row-level security and seat functions on an in-process Postgres
 
   android:
     needs: checks

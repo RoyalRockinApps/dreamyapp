@@ -6,11 +6,13 @@ import { FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } 
 import { Avatar, Empty, Txt } from '@/components/ui';
 import { canPost, canSeeChannel } from '@/hooks/useChannels';
 import { fmtTime, relativeDay, sameDay } from '@/lib/dates';
+import { usePoll } from '@/store/sync';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C, R } from '@/theme';
 
 export default function ChatScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  usePoll(['messages'], 4000); // new messages from others show up within a few seconds
   const user = useCurrentUser();
   const channel = useStore((s) => s.channels.find((c) => c.id === id));
   const production = useStore((s) => s.productions.find((p) => p.id === channel?.productionId));

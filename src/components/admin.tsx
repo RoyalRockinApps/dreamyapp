@@ -3,6 +3,7 @@ import { router, usePathname, type Href } from 'expo-router';
 import { Children, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native';
 
+import { LIVE } from '@/lib/backend';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C, R, SP } from '@/theme';
 import { Button, Card, Field, Row, Txt, type IconName } from './ui';
@@ -15,7 +16,7 @@ export const ADMIN_SECTIONS: { href: string; key: string; title: string; icon: I
   { href: '/admin/seating', key: 'seating', title: 'Seating chart', icon: 'grid', blurb: 'Rows, sections, price tiers and accessible spaces' },
   { href: '/admin/shows', key: 'shows', title: 'Shows & tickets', icon: 'ticket', blurb: 'Performances, ticket prices, on-sale and fees' },
   { href: '/admin/people', key: 'people', title: 'People & access', icon: 'people', blurb: 'Owners, staff, renters and cast accounts' },
-  { href: '/admin/data', key: 'data', title: 'Data & security', icon: 'shield-checkmark', blurb: 'Backup, restore, reset and admin PIN' },
+  { href: '/admin/data', key: 'data', title: 'Data & security', icon: 'shield-checkmark', blurb: LIVE ? 'Download a backup of everything' : 'Backup, restore, reset and admin PIN' },
 ];
 
 export function useIsWide() {
@@ -79,8 +80,26 @@ export function Sidebar() {
   );
 }
 
-/** Demo owner sign-in. Real accounts arrive with the backend (docs/BACKEND.md). */
+/** Live mode: the portal opens for signed-in owners only. Demo mode: the admin PIN switches to the owner persona. */
 export function AdminSignIn() {
+  if (LIVE) return <OwnersOnly />;
+  return <DemoPinSignIn />;
+}
+
+function OwnersOnly() {
+  return (
+    <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <Card style={{ width: '100%', maxWidth: 420, gap: 14 }}>
+        <Ionicons name="lock-closed" size={32} color={C.gold} />
+        <Txt v="h1">Owners only</Txt>
+        <Txt v="muted">The admin portal is for the theatre’s owners. If you help run the theatre, ask an owner to change your role in People & access.</Txt>
+        <Button variant="ghost" title="Back to the app" onPress={() => router.navigate('/')} />
+      </Card>
+    </View>
+  );
+}
+
+function DemoPinSignIn() {
   const pin = useStore((s) => s.adminPin);
   const users = useStore((s) => s.users);
   const switchUser = useStore((s) => s.switchUser);
@@ -183,7 +202,7 @@ export function useSetupChecklist(): ChecklistItem[] {
     { key: 'seating', title: 'Match the seating chart to the house', done: !!setup.seating, href: '/admin/seating' },
     { key: 'shows', title: 'Put a show on sale', done: performances.some((p) => p.onSale && p.start > now), href: '/admin/shows' },
     { key: 'people', title: 'Add your staff & cast', done: users.filter((u) => u.role !== 'renter').length > 1, href: '/admin/people' },
-    { key: 'pin', title: 'Change the demo admin PIN', done: !!setup.pin, href: '/admin/data' },
+    ...(LIVE ? [] : [{ key: 'pin', title: 'Change the demo admin PIN', done: !!setup.pin, href: '/admin/data' }]),
     { key: 'payments', title: 'Connect card payments (Stripe)', done: false, note: 'Demo payments are active. See docs/BACKEND.md to go live.' },
   ];
 }

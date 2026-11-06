@@ -6,8 +6,7 @@ import { MonthCalendar } from '@/components/MonthCalendar';
 import { Button, Chips, Field, Row, Screen, Txt } from '@/components/ui';
 import { addDays, atMinutes, dayKey, fmtDate } from '@/lib/dates';
 import { uid } from '@/lib/ids';
-import { OWNER_ID } from '@/lib/seed';
-import { useStore } from '@/store/useStore';
+import { useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 import { alert } from '@/components/alert';
 
@@ -16,6 +15,7 @@ const GROUP_COLORS = ['#E8B04B', '#7FB7BE', '#F08FC0', '#9B8DE3', '#E26D5C', '#5
 const SHOW_COLORS = ['#6CC596', '#E8B04B', '#E26D5C', '#9B8DE3', '#5DA9E9', '#F08FC0'];
 
 export default function NewProduction() {
+  const user = useCurrentUser();
   const createProduction = useStore((s) => s.createProduction);
   const [title, setTitle] = useState('');
   const [tagline, setTagline] = useState('');
@@ -36,7 +36,7 @@ export default function NewProduction() {
       openingDate: atMinutes(opening, 19 * 60).toISOString(),
       closingDate: closing.toISOString(),
       groups: groups.map((name) => ({ id: uid('g_'), name, color: GROUP_COLORS[PRESET_GROUPS.indexOf(name) % GROUP_COLORS.length] ?? C.gold })),
-      members: [{ userId: OWNER_ID, groupIds: [], part: 'Director / Producer', isDirector: true }],
+      members: [{ userId: user.id, groupIds: [], part: 'Director / Producer', isDirector: true }],
     });
     router.replace(`/production/${p.id}?tab=company`);
   };
