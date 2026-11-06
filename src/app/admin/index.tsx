@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, type Href } from 'expo-router';
 import { Linking, Platform, View } from 'react-native';
 
-import { ADMIN_SECTIONS, AdminPage, Grid, useIsWide } from '@/components/admin';
+import { ADMIN_SECTIONS, AdminPage, Grid, useIsWide, useSetupChecklist } from '@/components/admin';
 import { Card, ListItem, Pill, ProgressBar, Row, Stat, Txt } from '@/components/ui';
 import { money } from '@/lib/dates';
 import { outstanding } from '@/lib/pricing';
@@ -13,23 +13,12 @@ import { C } from '@/theme';
 export default function AdminOverview() {
   const wide = useIsWide();
   const venue = useStore((s) => s.venue);
-  const setup = useStore((s) => s.setup);
-  const users = useStore((s) => s.users);
   const bookings = useStore((s) => s.bookings);
   const performances = useStore((s) => s.performances);
   const tickets = useStore((s) => s.tickets);
   const now = new Date().toISOString();
 
-  const checklist: { key: string; title: string; done: boolean; href?: string; note?: string }[] = [
-    { key: 'venue', title: 'Confirm venue name & contact details', done: !!setup.venue, href: '/admin/venue' },
-    { key: 'rates', title: 'Set your real rental rates, deposit & policy', done: !!setup.rates, href: '/admin/rates' },
-    { key: 'packages', title: 'Review packages and add-ons', done: !!setup.packages, href: '/admin/packages' },
-    { key: 'seating', title: 'Match the seating chart to the house', done: !!setup.seating, href: '/admin/seating' },
-    { key: 'shows', title: 'Put a show on sale', done: performances.some((p) => p.onSale && p.start > now), href: '/admin/shows' },
-    { key: 'people', title: 'Add your staff & cast', done: users.filter((u) => u.role !== 'renter').length > 1, href: '/admin/people' },
-    { key: 'pin', title: 'Change the demo admin PIN', done: !!setup.pin, href: '/admin/data' },
-    { key: 'payments', title: 'Connect card payments (Stripe)', done: false, note: 'Demo payments are active. See docs/BACKEND.md to go live.' },
-  ];
+  const checklist = useSetupChecklist();
   const done = checklist.filter((c) => c.done).length;
 
   const requests = bookings.filter((b) => b.status === 'inquiry').length;

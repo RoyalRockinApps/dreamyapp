@@ -70,6 +70,17 @@ ships to **iOS, Android** and the web.
 
 Signing in requires the **admin PIN** (demo PIN `2020`; change it in Data & security).
 
+### 5. Customizable home screen
+Tap **Customize home** at the bottom of Home to show, hide and reorder sections and to pick up to
+four shortcuts. Each person's layout is saved separately, so owners, renters and cast each start from
+their own sensible default. **Reset to default** restores it.
+
+| Role | Sections available |
+|---|---|
+| Owner | Shortcuts, Needs you, Coming up, Next show, This month (money), Messages, Setup progress |
+| Renter | Book the theatre, Your bookings, On stage soon, Contact |
+| Cast & crew | Next call, Production hub, After that, Announcements, My tickets |
+
 ### Three roles, one app
 Use the profile icon (top right) → **Preview the app as…** to switch personas:
 

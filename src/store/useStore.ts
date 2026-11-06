@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
+import { normalizeLayout, type HomeLayout } from '@/lib/home';
 import { uid, ticketCode } from '@/lib/ids';
 import { quoteRental } from '@/lib/pricing';
 import { claimsOutside, commitSale, configureHouse, DEFAULT_HOUSE, holdSeats, orderTotals, priceFor, releaseHolds, releaseSeats, setBlocked, type HouseConfig } from '@/lib/seating';
@@ -48,6 +49,9 @@ export interface AppState {
   /** admin setup checklist: sections the owner has reviewed & saved */
   setup: Record<string, boolean>;
   markSetup(key: string): void;
+  /** per-person home screen layout (missing = role default) */
+  homeLayouts: Record<string, HomeLayout>;
+  setHomeLayout(userId: string, layout: HomeLayout | null): void;
 
   switchUser(id: string): void;
   updateHouse(h: HouseConfig): void; // throws if sold/blocked seats would vanish
@@ -105,6 +109,7 @@ function fresh() {
     house: DEFAULT_HOUSE,
     adminPin: '2020',
     setup: {} as Record<string, boolean>,
+    homeLayouts: {} as Record<string, HomeLayout>,
     ...seed,
   };
 }
@@ -133,6 +138,13 @@ export const useStore = create<AppState>()(
         },
         setAdminPin: (pin) => set({ adminPin: pin }),
         markSetup: (key) => set((s) => ({ setup: { ...s.setup, [key]: true } })),
+        setHomeLayout: (userId, layout) =>
+          set((s) => {
+            const next = { ...s.homeLayouts };
+            if (layout) next[userId] = layout;
+            else delete next[userId];
+            return { homeLayouts: next };
+          }),
         addUser: (u) => {
           const user: User = { ...u, id: uid('u_'), color: COLORS[get().users.length % COLORS.length] };
           set((s) => ({ users: [...s.users, user] }));
@@ -341,7 +353,7 @@ export const useStore = create<AppState>()(
 
 const DATA_KEYS = [
   'currentUserId', 'venue', 'settings', 'users', 'bookings', 'productions', 'schedule', 'conflicts',
-  'channels', 'messages', 'lastRead', 'performances', 'orders', 'tickets', 'house', 'adminPin', 'setup',
+  'channels', 'messages', 'lastRead', 'performances', 'orders', 'tickets', 'house', 'adminPin', 'setup', 'homeLayouts',
 ] as const;
 type Data = Pick<AppState, (typeof DATA_KEYS)[number]>;
 
@@ -359,4 +371,11 @@ export function useCurrentUser(): User {
 
 export function useIsOwner(): boolean {
   return useCurrentUser().role === 'owner';
+}
+
+/** The current person's home layout, falling back to their role's default. */
+export function useHomeLayout(): HomeLayout {
+  const user = useCurrentUser();
+  const saved = useStore((s) => s.homeLayouts[user.id]);
+  return normalizeLayout(user.role, saved);
 }
