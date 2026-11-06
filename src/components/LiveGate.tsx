@@ -3,6 +3,7 @@ import { useState, type ReactNode } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 
 import { Button, Card, Field, Txt } from '@/components/ui';
+import { Wordmark } from '@/components/Wordmark';
 import { VENUE } from '@/lib/seed';
 import { lastSignOutReason, sendCode as requestCode, verifyCode } from '@/lib/remote/auth';
 import { retryLive, signOut, useLive } from '@/store/sync';
@@ -28,7 +29,7 @@ export function LiveGate() {
         </Card>
       ) : (
         <View style={{ alignItems: 'center', gap: 12 }}>
-          <ActivityIndicator color={C.gold} size="large" />
+          <ActivityIndicator color={C.accent} size="large" />
           <Txt v="muted">{status === 'loading' ? 'Raising the curtain…' : 'Opening the theatre…'}</Txt>
         </View>
       )}
@@ -79,10 +80,9 @@ function SignIn() {
 
   return (
     <Shell>
-      <View style={{ alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <Ionicons name="sparkles" size={30} color={C.gold} />
-        <Txt v="display" style={{ textAlign: 'center' }}>{VENUE.name}</Txt>
-        <Txt v="muted" style={{ textAlign: 'center' }}>{VENUE.tagline}</Txt>
+      <View style={{ alignItems: 'center', gap: 14, marginBottom: 8 }}>
+        <Wordmark width={280} />
+        <Txt v="muted" style={{ textAlign: 'center', letterSpacing: 0.5 }}>{VENUE.tagline}</Txt>
       </View>
       <Card style={{ gap: 14 }}>
         {step === 'email' ? (

@@ -35,7 +35,7 @@ export default function NewProduction() {
       color,
       openingDate: atMinutes(opening, 19 * 60).toISOString(),
       closingDate: closing.toISOString(),
-      groups: groups.map((name) => ({ id: uid('g_'), name, color: GROUP_COLORS[PRESET_GROUPS.indexOf(name) % GROUP_COLORS.length] ?? C.gold })),
+      groups: groups.map((name) => ({ id: uid('g_'), name, color: GROUP_COLORS[PRESET_GROUPS.indexOf(name) % GROUP_COLORS.length] ?? C.accent })),
       members: [{ userId: user.id, groupIds: [], part: 'Director / Producer', isDirector: true }],
     });
     router.replace(`/production/${p.id}?tab=company`);

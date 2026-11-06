@@ -9,7 +9,7 @@ import { addDays, addMinutes, atMinutes, dayKey, fmtDate, fmtMinutes, fmtTime } 
 import { findConflicts, memberConflictsFor, stageBusy } from '@/lib/scheduling';
 import { SCHEDULE_KINDS, SPACES, type ScheduleKind, type Space } from '@/lib/types';
 import { useStore } from '@/store/useStore';
-import { C, R } from '@/theme';
+import { C, F, R } from '@/theme';
 import { alert } from '@/components/alert';
 
 const TIMES = Array.from({ length: 31 }, (_, i) => 7 * 60 + i * 30); // 7:00am – 10:00pm
@@ -95,8 +95,8 @@ export default function EditCall() {
         {TIMES.map((m) => {
           const on = m === startMin;
           return (
-            <Pressable key={m} onPress={() => { tap(); setStartMin(m); }} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: R.md, borderWidth: 1, borderColor: on ? C.gold : C.border, backgroundColor: on ? C.goldSoft : C.surface }}>
-              <Text style={{ color: on ? C.gold : C.text, fontWeight: '700' }}>{fmtMinutes(m)}</Text>
+            <Pressable key={m} onPress={() => { tap(); setStartMin(m); }} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: R.md, borderWidth: 1, borderColor: on ? C.accent : C.border, backgroundColor: on ? C.accentSoft : C.surface }}>
+              <Text style={{ color: on ? C.accent : C.text, fontFamily: F.bold }}>{fmtMinutes(m)}</Text>
             </Pressable>
           );
         })}

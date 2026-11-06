@@ -9,7 +9,7 @@ import { atMinutes, dayKey, fmtMinutes } from '@/lib/dates';
 import { TIER_LABEL } from '@/lib/seating';
 import type { PriceTier } from '@/lib/types';
 import { useStore } from '@/store/useStore';
-import { C, R } from '@/theme';
+import { C, F, R } from '@/theme';
 import { alert } from '@/components/alert';
 
 const TIMES = Array.from({ length: 25 }, (_, i) => 10 * 60 + i * 30);
@@ -83,8 +83,8 @@ export default function NewPerformance() {
       <Txt v="label">Curtain</Txt>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
         {TIMES.map((m) => (
-          <Pressable key={m} onPress={() => { tap(); setStartMin(m); }} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: R.md, borderWidth: 1, borderColor: m === startMin ? C.gold : C.border, backgroundColor: m === startMin ? C.goldSoft : C.surface }}>
-            <Text style={{ color: m === startMin ? C.gold : C.text, fontWeight: '700' }}>{fmtMinutes(m)}</Text>
+          <Pressable key={m} onPress={() => { tap(); setStartMin(m); }} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: R.md, borderWidth: 1, borderColor: m === startMin ? C.accent : C.border, backgroundColor: m === startMin ? C.accentSoft : C.surface }}>
+            <Text style={{ color: m === startMin ? C.accent : C.text, fontFamily: F.bold }}>{fmtMinutes(m)}</Text>
           </Pressable>
         ))}
       </ScrollView>

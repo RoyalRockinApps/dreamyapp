@@ -47,7 +47,7 @@ function ProductionCard({ p }: { p: Production }) {
     <Card onPress={() => router.push(`/production/${p.id}`)} accent={p.color}>
       <Row>
         <Txt v="h2" style={{ flex: 1 }}>{p.title}</Txt>
-        {unread > 0 && <Pill icon="chatbubble" label={String(unread)} color={C.gold} bg={C.goldSoft} />}
+        {unread > 0 && <Pill icon="chatbubble" label={String(unread)} color={C.accent} bg={C.accentSoft} />}
       </Row>
       <Txt v="small">{[daysToOpen > 0 ? `Opens in ${daysToOpen} days` : `${fmtDate(p.openingDate)} – ${fmtDate(p.closingDate)}`, me?.part && !me.isDirector ? `You: ${me.part}` : ''].filter(Boolean).join(' · ')}</Txt>
       {next && <Txt v="small" color={C.purple}>{`Next: ${next.title} · ${relativeDay(next.start)} ${fmtTime(next.start)}`}</Txt>}

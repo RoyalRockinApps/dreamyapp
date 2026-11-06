@@ -104,14 +104,14 @@ function Stepper({ label, value, onChange, sub }: { label: string; value: number
       <Txt v="label">{label}</Txt>
       <Row style={{ backgroundColor: C.surface2, borderRadius: R.md, padding: 8, borderWidth: 1, borderColor: C.border }}>
         <Pressable hitSlop={8} onPress={() => onChange(value - 1)}>
-          <Ionicons name="remove-circle" size={28} color={C.gold} />
+          <Ionicons name="remove-circle" size={28} color={C.accent} />
         </Pressable>
         <View style={{ flex: 1, alignItems: 'center' }}>
           <Txt v="h2">{String(value)}</Txt>
           {sub ? <Txt v="small">{sub}</Txt> : null}
         </View>
         <Pressable hitSlop={8} onPress={() => onChange(value + 1)}>
-          <Ionicons name="add-circle" size={28} color={C.gold} />
+          <Ionicons name="add-circle" size={28} color={C.accent} />
         </Pressable>
       </Row>
     </View>
