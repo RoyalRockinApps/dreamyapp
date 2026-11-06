@@ -6,7 +6,7 @@ import { SHORTCUT_META } from '@/components/HomeWidgets';
 import { Button, Group, Screen, SectionHeader, Txt, tap } from '@/components/ui';
 import { DEFAULT_LAYOUT, MAX_SHORTCUTS, moveItem, SHORTCUTS, WIDGET_INFO, WIDGETS, type HomeLayout, type ShortcutId, type WidgetId } from '@/lib/home';
 import { useCurrentUser, useHomeLayout, useStore } from '@/store/useStore';
-import { C, R } from '@/theme';
+import { C, F, R } from '@/theme';
 
 export default function CustomizeHome() {
   const user = useCurrentUser();
@@ -82,7 +82,7 @@ export default function CustomizeHome() {
                   }}>
                   <Ionicons name={m.icon} size={20} color={on ? m.color : C.muted} />
                   <Txt v="small" color={on ? C.text : C.muted}>{m.label}</Txt>
-                  {on ? <Txt v="small" color={m.color} style={{ fontSize: 10, fontWeight: '800' }}>{String(layout.shortcuts.indexOf(id) + 1)}</Txt> : null}
+                  {on ? <Txt v="small" color={m.color} style={{ fontSize: 10, fontFamily: F.bold }}>{String(layout.shortcuts.indexOf(id) + 1)}</Txt> : null}
                 </Pressable>
               );
             })}
@@ -112,7 +112,7 @@ function WidgetRow({ id, on, onToggle, onUp, onDown }: { id: WidgetId; on: boole
         <Txt v="h3">{info.title}</Txt>
         <Txt v="small">{info.blurb}</Txt>
       </View>
-      <Switch accessibilityLabel={`Show ${info.title}`} value={on} onValueChange={onToggle} trackColor={{ true: C.gold, false: C.surface2 }} />
+      <Switch accessibilityLabel={`Show ${info.title}`} value={on} onValueChange={onToggle} trackColor={{ true: C.accent, false: C.surface2 }} />
     </View>
   );
 }
@@ -120,7 +120,7 @@ function WidgetRow({ id, on, onToggle, onUp, onDown }: { id: WidgetId; on: boole
 function Arrow({ icon, onPress, label }: { icon: 'chevron-up' | 'chevron-down'; onPress?: () => void; label: string }) {
   return (
     <Pressable accessibilityLabel={label} disabled={!onPress} hitSlop={6} onPress={() => { tap(); onPress?.(); }} style={{ opacity: onPress ? 1 : 0.2 }}>
-      <Ionicons name={icon} size={18} color={C.gold} />
+      <Ionicons name={icon} size={18} color={C.accent} />
     </Pressable>
   );
 }

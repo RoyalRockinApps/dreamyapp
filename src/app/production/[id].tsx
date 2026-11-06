@@ -12,7 +12,7 @@ import { calledMemberIds, isCalled, memberConflictsFor } from '@/lib/scheduling'
 import { salesSummary } from '@/lib/seating';
 import type { MemberConflict, Production, Rsvp, ScheduleItem } from '@/lib/types';
 import { useCurrentUser, useStore } from '@/store/useStore';
-import { C } from '@/theme';
+import { C, F } from '@/theme';
 import { alert } from '@/components/alert';
 
 type Tab = 'schedule' | 'company' | 'chat' | 'tickets';
@@ -84,7 +84,7 @@ function ScheduleTab({ p, highlight }: { p: Production; highlight?: string }) {
       {days.length === 0 && <Empty icon="calendar-outline" title={showPast ? 'No past calls' : 'Nothing scheduled'} />}
       {days.map(([k, list]) => (
         <View key={k} style={{ gap: 8 }}>
-          <Txt v="label" color={C.gold}>{relativeDay(atMinutes(k, 0))}</Txt>
+          <Txt v="label" color={C.accent}>{relativeDay(atMinutes(k, 0))}</Txt>
           {list.map((it) => (
             <ScheduleCard key={it.id} item={it} p={p} canEdit={isOwner} highlighted={it.id === highlight} />
           ))}
@@ -116,10 +116,10 @@ function ScheduleCard({ item, p, canEdit, highlighted }: { item: ScheduleItem; p
   const kindColor = item.kind === 'Tech' || item.kind === 'Dress' ? C.curtain : item.kind === 'Call Time' ? C.gold : C.purple;
 
   return (
-    <Card accent={kindColor} style={highlighted ? { borderColor: C.gold } : undefined} onPress={() => setOpen(!open)}>
+    <Card accent={kindColor} style={highlighted ? { borderColor: C.accent } : undefined} onPress={() => setOpen(!open)}>
       <Row>
         <Txt v="h3" style={{ flex: 1 }}>{item.title}</Txt>
-        {canEdit && <Ionicons name="create-outline" size={20} color={C.gold} onPress={() => router.push(`/rehearsal/edit?id=${item.id}` as Href)} />}
+        {canEdit && <Ionicons name="create-outline" size={20} color={C.accent} onPress={() => router.push(`/rehearsal/edit?id=${item.id}` as Href)} />}
       </Row>
       <Txt v="small">{`${fmtTime(item.start)}–${fmtTime(item.end)} · ${item.space} · ${groups ? groups.map((g) => g!.name).join(', ') : 'Full company'}`}</Txt>
       {canEdit && (
@@ -234,7 +234,7 @@ function CompanyTab({ p }: { p: Production }) {
   };
 
   const sections = [
-    { id: '_dir', name: 'Directors & Staff', color: C.gold, members: p.members.filter((m) => m.isDirector) },
+    { id: '_dir', name: 'Directors & Staff', color: C.accent, members: p.members.filter((m) => m.isDirector) },
     ...p.groups.map((g) => ({ ...g, members: p.members.filter((m) => m.groupIds.includes(g.id) && !m.isDirector) })),
   ];
 
@@ -285,7 +285,7 @@ function CompanyTab({ p }: { p: Production }) {
                       <Txt v="h3">{u.name + (u.id === user.id ? ' (you)' : '')}</Txt>
                       {m.part ? <Txt v="small">{m.part}</Txt> : null}
                     </View>
-                    {u.id !== user.id && <Ionicons name="chatbubble-ellipses-outline" size={22} color={C.gold} onPress={() => message(u.id)} />}
+                    {u.id !== user.id && <Ionicons name="chatbubble-ellipses-outline" size={22} color={C.accent} onPress={() => message(u.id)} />}
                   </Pressable>
                   {editing === `${sec.id}:${u.id}` && (
                     <View style={{ paddingBottom: 10 }}>
@@ -338,8 +338,8 @@ function ChatTab({ p }: { p: Production }) {
               {other ? (
                 <Avatar name={other.name} color={other.color} />
               ) : (
-                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: (group?.color ?? C.gold) + '22', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name={icon} size={18} color={group?.color ?? C.gold} />
+                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: (group?.color ?? C.accent) + '22', alignItems: 'center', justifyContent: 'center' }}>
+                  <Ionicons name={icon} size={18} color={group?.color ?? C.accent} />
                 </View>
               )}
               <View style={{ flex: 1, gap: 2 }}>
@@ -350,8 +350,8 @@ function ChatTab({ p }: { p: Production }) {
                 <Txt v="small" numberOfLines={1}>{last ? `${sender?.name.split(' ')[0]}: ${last.text}` : 'No messages yet'}</Txt>
               </View>
               {unread > 0 && (
-                <View style={{ minWidth: 22, height: 22, borderRadius: 11, backgroundColor: C.gold, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
-                  <Txt v="small" color="#1A1206" style={{ fontWeight: '800' }}>{String(unread)}</Txt>
+                <View style={{ minWidth: 22, height: 22, borderRadius: 11, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
+                  <Txt v="small" color={C.onAccent} style={{ fontFamily: F.bold }}>{String(unread)}</Txt>
                 </View>
               )}
             </Row>

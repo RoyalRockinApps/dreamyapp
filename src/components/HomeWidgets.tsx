@@ -17,12 +17,12 @@ import { C, STATUS_META } from '@/theme';
 // ---------------- Shortcuts ----------------
 
 export const SHORTCUT_META: Record<ShortcutId, { icon: IconName; label: string; color: string; href: string }> = {
-  booking: { icon: 'add', label: 'Booking', color: C.gold, href: '/booking/new' },
+  booking: { icon: 'add', label: 'Booking', color: C.accent, href: '/booking/new' },
   rehearsal: { icon: 'musical-notes', label: 'Rehearsal', color: C.purple, href: '/rehearsal/edit' },
   boxOffice: { icon: 'ticket', label: 'Box office', color: C.curtain, href: '/tickets' },
   checkIn: { icon: 'qr-code', label: 'Check-in', color: C.green, href: '/tickets' },
   calendar: { icon: 'calendar', label: 'Calendar', color: C.blue, href: '/calendar' },
-  rentals: { icon: 'key', label: 'Rentals', color: C.gold, href: '/rentals' },
+  rentals: { icon: 'key', label: 'Rentals', color: C.accent, href: '/rentals' },
   shows: { icon: 'people', label: 'Shows', color: C.purple, href: '/shows' },
   admin: { icon: 'settings', label: 'Admin', color: C.blue, href: '/admin' },
   newShow: { icon: 'add-circle', label: 'Performance', color: C.curtain, href: '/performance/new' },
@@ -165,11 +165,11 @@ function MessagesWidget() {
           {unread.map(({ channel, last, unread: n, title }) => (
             <Line
               key={channel.id}
-              dot={C.gold}
+              dot={C.accent}
               title={title}
               detail={last ? `${users.find((u) => u.id === last.userId)?.name.split(' ')[0]}: ${last.text}` : undefined}
               value={String(n)}
-              valueColor={C.gold}
+              valueColor={C.accent}
               onPress={() => router.push(`/chat/${channel.id}`)}
             />
           ))}
@@ -329,7 +329,7 @@ function HubWidget() {
               title={p.title}
               detail={[unread ? `${unread} unread` : 'Schedule, cast & chat', toRsvp ? `${toRsvp} to RSVP` : ''].filter(Boolean).join(' · ')}
               value={unread ? '●' : undefined}
-              valueColor={C.gold}
+              valueColor={C.accent}
               onPress={() => router.push(`/production/${p.id}`)}
             />
           </Group>

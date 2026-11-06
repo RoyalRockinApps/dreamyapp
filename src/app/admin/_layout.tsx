@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { AdminSignIn, Sidebar, useIsWide } from '@/components/admin';
 import { useCurrentUser } from '@/store/useStore';
-import { C } from '@/theme';
+import { C, F } from '@/theme';
 
 export default function AdminLayout() {
   const user = useCurrentUser();
@@ -27,8 +27,8 @@ export default function AdminLayout() {
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: C.bg },
-        headerTintColor: C.gold,
-        headerTitleStyle: { color: C.text, fontWeight: '700' },
+        headerTintColor: C.accent,
+        headerTitleStyle: { color: C.text, fontFamily: F.display },
         headerShadowVisible: false,
         headerBackButtonDisplayMode: 'minimal',
         contentStyle: { backgroundColor: C.bg },

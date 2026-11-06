@@ -43,7 +43,7 @@ export default function Pay() {
 
   return (
     <Screen>
-      <Card accent={C.gold}>
+      <Card accent={C.accent}>
         <Txt v="label">{kind === 'balance' ? 'Remaining balance' : 'Reservation deposit'}</Txt>
         <Txt v="h2">{booking.title}</Txt>
         <Txt v="muted">{fmtRange(booking.start, booking.end)}</Txt>
@@ -55,7 +55,7 @@ export default function Pay() {
           </>
         )}
         {paid > 0 && <KeyValue k="Already paid" v={`-${money(paid, true)}`} />}
-        <KeyValue k="Due today" v={money(amount, true)} strong color={C.gold} />
+        <KeyValue k="Due today" v={money(amount, true)} strong color={C.accent} />
       </Card>
       <CardForm
         amount={amount}

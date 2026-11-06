@@ -5,7 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View, typ
 import { getHouse, layoutFor, seatAvailability, TIER_LABEL, type Availability, type HouseConfig } from '@/lib/seating';
 import { useStore } from '@/store/useStore';
 import type { PriceTier, Seat, SeatClaim } from '@/lib/types';
-import { C, R } from '@/theme';
+import { C, F, R } from '@/theme';
 import { Segmented, tap } from './ui';
 
 export const TIER_COLOR: Record<PriceTier, string> = {
@@ -70,17 +70,17 @@ export function SeatMap({ claims, holderId, selected, onToggle, manage, now, hou
     let icon: React.ReactNode = null;
     if (isSel) {
       bg = '#FFFFFF';
-      border = C.gold;
-      if (size >= 16) icon = <Ionicons name="checkmark" size={size - 8} color="#1A1206" />;
+      border = C.accent;
+      if (size >= 16) icon = <Ionicons name="checkmark" size={size - 8} color={C.onAccent} />;
     } else if (a === 'sold') {
-      bg = '#2B2640';
-      border = '#2B2640';
+      bg = '#262626';
+      border = '#262626';
       if (size >= 16) icon = <Ionicons name="close" size={size - 10} color={C.faint} />;
     } else if (a === 'held') {
       bg = C.warn + '30';
       border = C.warn + '60';
     } else if (a === 'blocked') {
-      bg = '#151124';
+      bg = '#141414';
       border = C.faint;
       if (size >= 16) icon = <Ionicons name="remove" size={size - 10} color={C.faint} />;
     } else if (seat.accessible && size >= 16) {
@@ -173,7 +173,7 @@ export function Legend({ prices }: { prices?: Record<PriceTier, number> }) {
     <View style={s.legend}>
       {(Object.keys(TIER_COLOR) as PriceTier[]).map((t) => item(TIER_COLOR[t], prices ? `${TIER_LABEL[t]} $${prices[t]}` : TIER_LABEL[t]))}
       {item('#FFFFFF', 'Yours', true)}
-      {item('#2B2640', 'Taken', true)}
+      {item('#262626', 'Taken', true)}
     </View>
   );
 }
@@ -181,7 +181,7 @@ export function Legend({ prices }: { prices?: Record<PriceTier, number> }) {
 const s = StyleSheet.create({
   wrap: { backgroundColor: C.surface, borderRadius: R.lg, borderWidth: 1, borderColor: C.border, overflow: 'hidden' },
   stage: { height: 26, backgroundColor: C.curtain, borderBottomLeftRadius: 60, borderBottomRightRadius: 60, alignItems: 'center', justifyContent: 'center', marginBottom: 18 },
-  stageText: { color: '#fff', fontWeight: '800', letterSpacing: 6, fontSize: 11 },
-  rowLabel: { color: C.faint, fontWeight: '700', textAlign: 'center', fontSize: 11 },
+  stageText: { color: '#fff', fontFamily: F.display, letterSpacing: 6, fontSize: 11 },
+  rowLabel: { color: C.faint, fontFamily: F.bold, textAlign: 'center', fontSize: 11 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, padding: 12, borderTopWidth: 1, borderTopColor: C.border },
 });

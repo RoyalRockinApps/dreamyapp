@@ -102,7 +102,7 @@ export default function BookingDetail() {
           <Txt v="h2" style={{ flex: 1 }}>{`${money(paid)} paid`}</Txt>
           <Txt v="muted">{`of ${money(grandTotal(b))}`}</Txt>
         </Row>
-        <ProgressBar value={paid / grandTotal(b)} color={due === 0 ? C.green : C.gold} />
+        <ProgressBar value={paid / grandTotal(b)} color={due === 0 ? C.green : C.accent} />
         <Txt v="small" color={due ? C.warn : C.green}>
           {due === 0 ? 'Paid in full' : depositRemaining > 0 ? `${money(depositRemaining, true)} deposit due now` : `${money(due, true)} balance due ${fmtDate(b.quote.balanceDueDate)}`}
         </Txt>
@@ -169,8 +169,8 @@ export default function BookingDetail() {
             <Txt v="h3">{b.contactName}</Txt>
             {b.organization && b.organization !== b.contactName ? <Txt v="small">{b.organization}</Txt> : null}
           </View>
-          <IconButton icon="call" color={C.gold} onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\D/g, '')}`)} />
-          <IconButton icon="mail" color={C.gold} onPress={() => Linking.openURL(`mailto:${b.contactEmail}?subject=${encodeURIComponent(b.title)}`)} />
+          <IconButton icon="call" color={C.accent} onPress={() => Linking.openURL(`tel:${b.contactPhone.replace(/\D/g, '')}`)} />
+          <IconButton icon="mail" color={C.accent} onPress={() => Linking.openURL(`mailto:${b.contactEmail}?subject=${encodeURIComponent(b.title)}`)} />
         </Row>
         {b.notes ? <Txt v="small">{`“${b.notes}”`}</Txt> : null}
       </Card>

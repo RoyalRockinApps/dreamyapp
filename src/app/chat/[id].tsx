@@ -64,15 +64,15 @@ export default function ChatScreen() {
                   {showName && <Txt v="small" color={u?.color}>{u?.name}</Txt>}
                   <View
                     style={{
-                      backgroundColor: mine ? C.gold : channel.kind === 'announcements' ? C.goldSoft : C.surface2,
+                      backgroundColor: mine ? C.accent : channel.kind === 'announcements' ? C.accentSoft : C.surface2,
                       borderRadius: R.lg,
                       borderBottomRightRadius: mine ? 4 : R.lg,
                       borderBottomLeftRadius: mine ? R.lg : 4,
                       paddingHorizontal: 12,
                       paddingVertical: 8,
                     }}>
-                    <Txt color={mine ? '#1A1206' : C.text}>{item.text}</Txt>
-                    <Txt v="small" color={mine ? '#5A4515' : C.faint} style={{ alignSelf: 'flex-end', fontSize: 10, marginTop: 2 }}>{fmtTime(item.at)}</Txt>
+                    <Txt color={mine ? C.onAccent : C.text}>{item.text}</Txt>
+                    <Txt v="small" color={mine ? 'rgba(17,17,17,0.55)' : C.faint} style={{ alignSelf: 'flex-end', fontSize: 10, marginTop: 2 }}>{fmtTime(item.at)}</Txt>
                   </View>
                 </View>
               </View>
@@ -96,8 +96,8 @@ export default function ChatScreen() {
               send(channel.id, text);
               setText('');
             }}
-            style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: text.trim() ? C.gold : C.surface2, alignItems: 'center', justifyContent: 'center' }}>
-            <Ionicons name="send" size={18} color={text.trim() ? '#1A1206' : C.faint} />
+            style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: text.trim() ? C.accent : C.surface2, alignItems: 'center', justifyContent: 'center' }}>
+            <Ionicons name="send" size={18} color={text.trim() ? C.onAccent : C.faint} />
           </Pressable>
         </View>
       ) : (
