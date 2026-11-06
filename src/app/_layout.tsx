@@ -3,10 +3,14 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
+import { LiveGate } from '@/components/LiveGate';
+import { LIVE } from '@/lib/backend';
+import { startLive, useLive } from '@/store/sync';
 import { useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
 SplashScreen.preventAutoHideAsync().catch(() => {});
+startLive();
 
 const theme = {
   ...DarkTheme,
@@ -14,11 +18,23 @@ const theme = {
 };
 
 export default function RootLayout() {
+  const liveStatus = useLive((s) => s.status);
+
   useEffect(() => {
     const hide = () => SplashScreen.hideAsync().catch(() => {});
     if (useStore.persist.hasHydrated()) hide();
     return useStore.persist.onFinishHydration(hide);
   }, []);
+
+  // Live mode: sign in and load the shared data before showing any screen.
+  if (LIVE && liveStatus !== 'ready') {
+    return (
+      <ThemeProvider value={theme}>
+        <StatusBar style="light" />
+        <LiveGate />
+      </ThemeProvider>
+    );
+  }
 
   return (
     <ThemeProvider value={theme}>

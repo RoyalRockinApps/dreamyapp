@@ -66,9 +66,10 @@ ships to **iOS, Android** and the web.
 | Seating chart | Rows, seats per section, premium and value rows, wheelchair spaces (tap seats in the live preview). Layouts that would remove a sold seat are blocked. |
 | Shows & tickets | Per-performance prices, on sale/off sale, delete, service fee per ticket |
 | People & access | Owners/staff, renters, cast & crew: add, edit, change role, remove |
-| Data & security | Backup download and restore (to move a setup between devices), reset demo data, change the admin PIN |
+| Data & security | Backup download. In the on-device demo also: restore, reset demo data, change the admin PIN |
 
-Signing in requires the **admin PIN** (demo PIN `2020`; change it in Data & security).
+In the live app only people whose role is **owner** can open the portal. In the on-device demo it
+asks for the **admin PIN** (demo PIN `2020`; change it in Data & security).
 
 ### 5. Customizable home screen
 Tap **Customize home** at the bottom of Home to show, hide and reorder sections and to pick up to
@@ -82,7 +83,8 @@ their own sensible default. **Reset to default** restores it.
 | Cast & crew | Next call, Production hub, After that, Announcements, My tickets |
 
 ### Three roles, one app
-Use the profile icon (top right) → **Preview the app as…** to switch personas:
+In the live app each person signs in and sees their own role. In the on-device demo, use the
+profile icon (top right) → **Preview the app as…** to switch personas:
 
 | Persona | Sees |
 |---|---|
@@ -119,10 +121,9 @@ use `npx eas-cli@latest build -p android --profile production` with your own upl
 go through TestFlight: `npx eas-cli@latest build -p ios` plus an Apple Developer account.
 `eas.json` also has a `preview` profile that builds an APK on Expo's servers.
 
-> **The app and the website run the same code and have the same features.** Until the shared backend
-> in `docs/BACKEND.md` is connected, each phone and each browser keeps **its own copy** of the data.
-> A change made on the website won't show up on a phone yet. To copy a setup between devices, use
-> **Admin → Data & security → Download backup / Restore**.
+> **The app and the website run the same code and share the same data** once the build has the
+> Neon settings (see *Live backend* below). A build without them runs the on-device demo, where
+> each phone and browser keeps its own copy.
 
 ## Run it
 
@@ -130,6 +131,11 @@ go through TestFlight: `npx eas-cli@latest build -p ios` plus an Apple Developer
 npm install
 npx expo start          # press i (iOS simulator), a (Android emulator), or scan the QR with a dev build
 ```
+
+With no Neon settings the app runs the on-device demo. To run against the live backend, run
+`neon env pull` (or `neon init`) to write `.env.local`, which git ignores; `.env.example` lists what
+it contains. Set `EXPO_PUBLIC_DEMO=1` to force the demo anyway. Restart `npx expo start` after
+changing env files.
 
 The app uses `expo-camera` for ticket scanning, which is included in Expo Go. For store builds:
 
@@ -144,6 +150,7 @@ Store accounts needed: Apple Developer Program and Google Play Console. Bundle i
 ### Checks
 ```bash
 npm test            # domain logic: seat auto-block, holds, best-available, pricing, conflicts, cards
+npm run test:db     # database: who can see/change what, seat holds & sales, check-in (in-process Postgres)
 npm run typecheck
 npx expo lint
 ```
@@ -167,24 +174,64 @@ src/
     performance/[id].tsx  seat map, holds, checkout, box office tools
     ticket/[id].tsx       QR ticket
     checkin/[id].tsx      door scanner
-    settings.tsx          personas, venue info, rates & policy
+    settings.tsx          sign out (live) or personas (demo), venue info
   lib/                    pure, unit-tested domain logic (no React)
     seating.ts            house layout, holds, atomic sale, orphan detection, best available
     pricing.ts            rental quotes, deposits, balances
     scheduling.ts         stage conflicts, open windows, member conflicts
     payments.ts           card validation + PaymentProvider interface (demo provider)
     seed.ts               demo data
-  store/useStore.ts       Zustand store persisted to AsyncStorage. Every mutation is an action.
-  components/             UI kit, MonthCalendar, SeatMap, CardForm
-docs/BACKEND.md           plan for going live: multi-user sync, Stripe, push, security
-docs/schema.sql           Postgres schema incl. race-safe seat purchase
+    backend.ts            Neon endpoints from app.config.js; LIVE is true when the build has them
+    remote/auth.ts        Neon Auth sign-in by emailed code (plain HTTP, works on iOS/Android/web)
+    remote/db.ts          Neon Data API client; attaches the signed-in person's token
+    remote/rows.ts        database rows <-> app types (unit-tested)
+    remote/api.ts         writes and server functions (holds, sales, check-in, payments)
+  store/useStore.ts       Zustand store. Every mutation is an action; in live mode it also writes to Neon
+  store/sync.ts           live mode: sign-in session, initial load, checking for changes
+  components/             UI kit, MonthCalendar, SeatMap, CardForm, LiveGate (email-code sign-in)
+db/migrations/            database schema, row-level security and server functions
+db/tests/                 those rules exercised as each role on an in-process Postgres
+scripts/db.ts             npm run db:migrate / db:seed against the Neon branch in .env.local
+scripts/seed-sql.ts       turns the demo data into SQL for a fresh database
+neon.ts                   Neon project config: Neon Auth and the Data API (apply with `neon deploy`)
+docs/BACKEND.md           backend design, what's done and what's next (Stripe, push)
 ```
 
 Tune the house layout (rows, section widths, tiers, accessible spaces) in `src/lib/seating.ts → HOUSE`
 to match the real seating chart.
 
-## Going live
-Right now the app is **local-first**: data lives on the device, so you can demo and try it with
-zero infrastructure. Making it multi-user means connecting a backend and a real card processor.
-`docs/BACKEND.md` covers the recommended Supabase + Stripe setup step by step. The store
-actions already map one-to-one to the API calls.
+## Live backend (Neon)
+The live app runs on a free [Neon](https://neon.com) project (Postgres in AWS us-east-1) with
+**Neon Auth** for sign-in and the **Neon Data API** for reads and writes.
+
+Everyone signs in with a **one-time code emailed to them** (no passwords). The server decides what each
+person can see and do (row-level security): renters see only their own bookings and see other events
+as "Reserved", cast see only their own productions and chats, and only owners can open the admin
+portal, approve bookings, sell at the box office or check tickets in. Seat holds, ticket sales and
+check-in run as database functions, so two people can never buy the same seat, and ticket prices
+come from the server. The app checks for other people's changes every 20 seconds, and every few
+seconds on the seat picker, in chat and at the door.
+
+Card payments are still **simulated** (demo card numbers above) until Stripe is connected. See
+`docs/BACKEND.md` for that and push notifications.
+
+> **Website sign-in limitation:** Neon keeps the sign-in session in a cookie from `neon.tech`. The
+> iOS and Android apps handle it fine, but on the website it's a third-party cookie, so sign-in fails
+> in Safari and in browsers that block third-party cookies (the sign-in screen says so). Details and
+> the fix options are in `docs/BACKEND.md`.
+
+**Setting up a Neon project** (one time; this repo's project is already set up):
+1. `npm i -g neon`, `neon login`, then `neon init` in this folder to create or link a project. It
+   writes `.env.local` and `.neon` (both git-ignored).
+2. `neon deploy` turns on Neon Auth and the Data API as declared in `neon.ts`.
+3. Turn off password sign-in so accounts only come from emailed codes:
+   `neon neon-auth config email-password update --enabled false`.
+4. `npm run db:migrate` creates the tables, rules and functions in `db/migrations`.
+5. Optional demo data: `npm run db:seed -- --owner you@example.com` (empty database only). That
+   email becomes the theatre owner; without the seed, add yourself to `people` with role `owner`.
+6. For the published website, trust its address: `neon neon-auth domain add https://<owner>.github.io`.
+7. For the APK and website builds, add GitHub repository variables (**Settings → Secrets and
+   variables → Actions → Variables**) `NEON_AUTH_BASE_URL` and `NEON_DATA_API_URL` with the values
+   from `.env.local`. They are public endpoints, not secrets. Never add `DATABASE_URL` there.
+8. Before inviting real renters and cast, connect your own email provider in Neon Auth. Neon's
+   shared sender is meant for development.

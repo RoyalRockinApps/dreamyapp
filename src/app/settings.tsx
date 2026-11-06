@@ -5,6 +5,8 @@ import { alert } from '@/components/alert';
 import { Avatar, Button, Card, ListItem, Pill, Row, Screen, SectionHeader, Txt } from '@/components/ui';
 import { APK_URL, WEB_URL } from '@/lib/links';
 import { MEMBER_ID, OWNER_ID, RENTER_ID } from '@/lib/seed';
+import { LIVE } from '@/lib/backend';
+import { signOut } from '@/store/sync';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
@@ -36,8 +38,22 @@ export default function Settings() {
         </Row>
       </Card>
 
-      <SectionHeader title="Preview the app as…" />
-      {PERSONAS.map((p) => {
+      {LIVE && (
+        <Button
+          variant="secondary"
+          icon="log-out-outline"
+          title="Sign out"
+          onPress={() =>
+            alert('Sign out?', 'You’ll need a new email code to sign back in.', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
+            ])
+          }
+        />
+      )}
+
+      {!LIVE && <SectionHeader title="Preview the app as…" />}
+      {!LIVE && PERSONAS.map((p) => {
         const u = users.find((x) => x.id === p.id);
         const on = user.id === p.id;
         return (
@@ -74,8 +90,8 @@ export default function Settings() {
         </>
       )}
 
-      <SectionHeader title="Demo data" />
-      <Card>
+      {!LIVE && <SectionHeader title="Demo data" />}
+      {!LIVE && <Card>
         <Txt v="small">Everything is stored on this device. Reset to restore the sample bookings, Elf: The Musical company and ticket sales.</Txt>
         <Button
           variant="danger"
@@ -87,7 +103,7 @@ export default function Settings() {
             ])
           }
         />
-      </Card>
+      </Card>}
       <Txt v="small" style={{ textAlign: 'center', marginTop: 12 }}>{`${venue.name} · ${venue.address}`}</Txt>
     </Screen>
   );

@@ -5,6 +5,7 @@ import { Platform, Share } from 'react-native';
 import { AdminPage } from '@/components/admin';
 import { alert } from '@/components/alert';
 import { Button, Card, Field, Row, Txt } from '@/components/ui';
+import { LIVE } from '@/lib/backend';
 import { useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
@@ -63,6 +64,24 @@ export default function AdminData() {
     };
     input.click();
   };
+
+  if (LIVE) {
+    return (
+      <AdminPage title="Data & security" subtitle="Your data is stored securely online and shared by the app and the website.">
+        <Card>
+          <Txt v="h3">Download a backup</Txt>
+          <Txt v="small">Saves a copy of everything you can see (venue, rates, seating, bookings, shows, people) as a file you keep.</Txt>
+          <Row style={{ flexWrap: 'wrap' }}>
+            <Button small icon="download" title={Platform.OS === 'web' ? 'Download backup (.json)' : 'Share backup'} onPress={doExport} />
+          </Row>
+        </Card>
+        <Card>
+          <Txt v="h3">Sign-in & access</Txt>
+          <Txt v="small">Everyone signs in with a one-time code sent to their email. What each person can see is enforced by the server: renters only see their own bookings, cast only see their own productions, and only owners can open this portal. Change someone’s role in People & access.</Txt>
+        </Card>
+      </AdminPage>
+    );
+  }
 
   return (
     <AdminPage title="Data & security" subtitle="Back up your setup, move it between the website and the app, or start over.">

@@ -23,7 +23,8 @@ import {
   type Availability,
 } from '@/lib/seating';
 import type { Order, Seat } from '@/lib/types';
-import { useCurrentUser, useStore } from '@/store/useStore';
+import { usePoll } from '@/store/sync';
+import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 import { alert } from '@/components/alert';
 
@@ -32,6 +33,7 @@ type Mode = 'sell' | 'comp' | 'block';
 
 export default function PerformanceScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  usePoll([`seats:${id}`], 4000); // other buyers' seats appear taken within a few seconds
   const user = useCurrentUser();
   const isOwner = user.role === 'owner';
   const perf = useStore((s) => s.performances.find((p) => p.id === id));
@@ -53,6 +55,7 @@ export default function PerformanceScreen() {
   const [buyerEmail, setBuyerEmail] = useState(isOwner ? '' : user.email);
   const [payWith, setPayWith] = useState<'card' | 'cash'>('card');
   const [order, setOrder] = useState<Order | null>(null);
+  const [paying, setPaying] = useState(false);
   const warnedExpiry = useRef(false);
 
   const mine = useMemo(
@@ -85,12 +88,14 @@ export default function PerformanceScreen() {
   const totals = orderTotals(mine, p.prices);
   const orphans = orphanedSeats(p.seats, mine, user.id, now);
 
-  const tryHold = (ids: string[]) => {
+  const tryHold = async (ids: string[]): Promise<boolean> => {
     try {
-      hold(p.id, ids);
+      await hold(p.id, ids);
+      return true;
     } catch (e) {
       if (e instanceof SeatUnavailableError) alert('Seat just taken', e.message);
-      else throw e;
+      else alert('Couldn’t hold those seats', errorMessage(e));
+      return false;
     }
   };
 
@@ -103,7 +108,7 @@ export default function PerformanceScreen() {
     if (a === 'mine') return release(p.id, [seat.id]);
     if (a === 'available') {
       if (mine.length >= MAX_SEATS) return alert(`Limit ${MAX_SEATS} seats per order`);
-      return tryHold([seat.id]);
+      return void tryHold([seat.id]);
     }
     if (isOwner && a === 'sold') return inspectSold(seat.id);
     if (isOwner && a === 'blocked') {
@@ -123,21 +128,25 @@ export default function PerformanceScreen() {
     ]);
   };
 
-  const pickBest = () => {
+  const pickBest = async () => {
     const n = Number(count);
-    release(p.id);
+    // seats already held by me count as available, so hold the new block first, then let go of the rest
     const ids = bestAvailable(p.seats, n, user.id, new Date(), { accessible: false });
     if (!ids) return alert('No block of seats together', `We couldn't find ${n} seats side by side. Try fewer seats or pick them on the map.`);
-    tryHold(ids);
+    if (!(await tryHold(ids))) return;
+    const leftover = mine.filter((sid) => !ids.includes(sid));
+    if (leftover.length) release(p.id, leftover);
   };
 
-  const complete = (method: Order['method']) => {
+  const complete = async (method: Order['method']) => {
     if (!buyerName.trim() || !/^\S+@\S+\.\S+$/.test(buyerEmail)) {
       alert('Add the buyer’s name and email so we can send the tickets');
       return false;
     }
+    if (paying) return false;
+    setPaying(true);
     try {
-      const o = purchase(p.id, mine, { name: buyerName.trim(), email: buyerEmail.trim() }, method);
+      const o = await purchase(p.id, mine, { name: buyerName.trim(), email: buyerEmail.trim() }, method);
       setOrder(o);
       setPhase('done');
       return true;
@@ -145,9 +154,12 @@ export default function PerformanceScreen() {
       if (e instanceof SeatUnavailableError) {
         alert('Seat no longer available', e.message);
         setPhase('pick');
-        return false;
+      } else {
+        alert('The sale didn’t go through', errorMessage(e));
       }
-      throw e;
+      return false;
+    } finally {
+      setPaying(false);
     }
   };
 
@@ -198,16 +210,16 @@ export default function PerformanceScreen() {
         <Field label="Name for the tickets" value={buyerName} onChangeText={setBuyerName} />
         <Field label="Email for delivery" value={buyerEmail} onChangeText={setBuyerEmail} keyboardType="email-address" autoCapitalize="none" />
         {isOwner && mode === 'comp' ? (
-          <Button title={`Issue ${mine.length} comp ticket${mine.length > 1 ? 's' : ''}`} icon="gift" onPress={() => complete('comp')} />
+          <Button title={`Issue ${mine.length} comp ticket${mine.length > 1 ? 's' : ''}`} icon="gift" loading={paying} onPress={() => void complete('comp')} />
         ) : isOwner && payWith === 'cash' ? (
           <>
             <Chips options={['card', 'cash'] as const} value={payWith} onChange={setPayWith} labels={{ card: 'Card', cash: 'Cash at the door' }} />
-            <Button title={`Take ${money(totals.total, true)} cash`} icon="cash" onPress={() => complete('cash')} />
+            <Button title={`Take ${money(totals.total, true)} cash`} icon="cash" loading={paying} onPress={() => void complete('cash')} />
           </>
         ) : (
           <>
             {isOwner && <Chips options={['card', 'cash'] as const} value={payWith} onChange={setPayWith} labels={{ card: 'Card', cash: 'Cash at the door' }} />}
-            <CardForm amount={totals.total} description={`${p.title} tickets`} defaultName={buyerName} onPaid={() => complete('card')} cta={`Pay ${money(totals.total, true)}`} />
+            <CardForm amount={totals.total} description={`${p.title} tickets`} defaultName={buyerName} onPaid={() => void complete('card')} cta={`Pay ${money(totals.total, true)}`} />
           </>
         )}
         <Button variant="ghost" title="Back to seat map" onPress={() => setPhase('pick')} />
