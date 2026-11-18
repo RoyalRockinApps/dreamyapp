@@ -3,9 +3,12 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 
 import { alert } from '@/components/alert';
+import { AUDITION_DETAILS_LIMIT, AUDITION_FEEDBACK_LIMIT, AUDITION_REVIEW_PAGE_SIZE, auditionSummary, hasPerformerProfile, performerProfileError } from '@/lib/auditions';
+import { EMPTY_CONCEPT } from '@/lib/concept';
 import { normalizeLayout, type HomeLayout } from '@/lib/home';
 import { uid, ticketCode } from '@/lib/ids';
 import { quoteRental } from '@/lib/pricing';
+import { canManageProduction, canPlanProduction, canReviewAudition, productionStage, STAGE_LABELS } from '@/lib/production';
 import * as api from '@/lib/remote/api';
 import { refresh, type Slice } from '@/lib/remote/bus';
 import { unavailableSeats } from '@/lib/remote/rows';
@@ -13,14 +16,31 @@ import { claimsOutside, commitSale, configureHouse, DEFAULT_HOUSE, holdSeats, or
 import { buildSeed, DEFAULT_SETTINGS, OWNER_ID, VENUE } from '@/lib/seed';
 import { LIVE } from '@/lib/backend';
 import type {
+  AuditionApplicant,
+  AuditionApplication,
+  AuditionDecision,
+  AuditionDraft,
+  AuditionFeedback,
+  AuditionReviewCard,
+  AuditionReviewFilter,
   Booking,
   Channel,
+  ConceptWorkspace,
+  FeasibilityCheck,
+  LinkRequest,
   MemberConflict,
+  Membership,
   Message,
+  OpenAudition,
   Order,
   Payment,
   Performance,
+  PerformerProfile,
   Production,
+  ProductionAudition,
+  ProductionBrief,
+  ProductionMilestone,
+  ProductionStage,
   RentalSettings,
   Rsvp,
   ScheduleItem,
@@ -61,6 +81,12 @@ export interface AppState {
   /** per-person home screen layout (missing = role default) */
   homeLayouts: Record<string, HomeLayout>;
   setHomeLayout(userId: string, layout: HomeLayout | null): void;
+  /** live mode, owner only: sign-ins waiting to be confirmed as an existing person */
+  linkRequests: LinkRequest[];
+  approveLink(authUserId: string): Promise<void>;
+  declineLink(authUserId: string): Promise<void>;
+  /** live mode: delete the signed-in person's account (App Store requirement) */
+  deleteMyAccount(): Promise<void>;
 
   switchUser(id: string): void;
   updateHouse(h: HouseConfig): void; // throws if sold/blocked seats would vanish
@@ -82,18 +108,45 @@ export interface AppState {
   addPayment(bookingId: string, p: Omit<Payment, 'id' | 'at'>): void;
 
   // productions
-  createProduction(p: Omit<Production, 'id'>): Production;
+  createProduction(p: Omit<Production, 'id' | 'stage' | 'milestones' | 'members'>): Promise<Production>;
+  updateProductionPitch(id: string, pitch: string): Promise<void>;
+  changeProductionStage(id: string, expected: ProductionStage, stage: ProductionStage): Promise<void>;
+  updateProductionRun(id: string, dates: Pick<Production, 'openingDate' | 'closingDate'>): Promise<void>;
+  addMilestone(productionId: string, milestone: Omit<ProductionMilestone, 'id' | 'completed'>): Promise<void>;
+  updateMilestone(productionId: string, id: string, patch: Partial<Omit<ProductionMilestone, 'id'>>): Promise<void>;
+  removeMilestone(productionId: string, id: string): Promise<void>;
+  productionConcepts: Partial<Record<string, ConceptWorkspace>>;
+  loadConcept(productionId: string): Promise<ConceptWorkspace>;
+  saveConceptBrief(productionId: string, brief: ProductionBrief): Promise<void>;
+  saveConceptAuditionDraft(productionId: string, draft: AuditionDraft): Promise<void>;
+  saveFeasibilityCheck(productionId: string, check: FeasibilityCheck): Promise<void>;
   upsertScheduleItem(item: Omit<ScheduleItem, 'id' | 'rsvps'> & { id?: string }): ScheduleItem;
   deleteScheduleItem(id: string): void;
   rsvp(itemId: string, userId: string, r: Rsvp): void;
   addConflict(c: Omit<MemberConflict, 'id'>): void;
   removeConflict(id: string): void;
-  addMember(productionId: string, user: Omit<User, 'id' | 'color' | 'role'>, groupIds: string[], part?: string): void;
-  setMemberGroups(productionId: string, userId: string, groupIds: string[]): void;
-  addGroup(productionId: string, name: string): void;
+  addMember(productionId: string, user: Omit<User, 'id' | 'color' | 'role'>, groupIds: string[], part?: string): Promise<void>;
+  updateCompanyMember(productionId: string, userId: string, patch: Partial<Omit<Membership, 'userId'>>): Promise<void>;
+  addGroup(productionId: string, name: string): Promise<void>;
   sendMessage(channelId: string, text: string): void;
   markRead(channelId: string): void;
   openDirect(productionId: string, otherUserId: string): string;
+
+  // Live profiles load on demand. Demo mode persists them with the other local data.
+  performerProfiles: Partial<Record<string, PerformerProfile>>;
+  productionAuditions: Partial<Record<string, ProductionAudition>>;
+  auditionEntries: (AuditionApplicant & { productionId: string; decision?: AuditionDecision; feedback?: AuditionFeedback[] })[];
+  loadPerformerProfile(personId: string): Promise<PerformerProfile | null>;
+  savePerformerProfile(profile: PerformerProfile): Promise<void>;
+  loadAuditions(): Promise<{ openings: OpenAudition[]; applications: AuditionApplication[] }>;
+  applyForAudition(productionId: string): Promise<void>;
+  withdrawAudition(productionId: string): Promise<void>;
+  loadProductionAudition(productionId: string): Promise<ProductionAudition | null>;
+  saveProductionAudition(productionId: string, audition: ProductionAudition): Promise<void>;
+  loadAuditionReviewCards(productionId: string, filter: AuditionReviewFilter, offset: number): Promise<AuditionReviewCard[]>;
+  saveAuditionReview(productionId: string, personId: string, expected: AuditionDecision, decision: AuditionDecision): Promise<void>;
+  loadAuditionFeedback(productionId: string, personId: string): Promise<AuditionFeedback[]>;
+  addAuditionFeedback(productionId: string, personId: string, entry: Pick<AuditionFeedback, 'id' | 'kind' | 'body'>): Promise<AuditionFeedback>;
 
   // ticketing
   createPerformance(p: Omit<Performance, 'id' | 'seats'>): Performance;
@@ -121,6 +174,11 @@ function fresh(): Data {
     adminPin: '2020',
     setup: {},
     homeLayouts: {},
+    productionConcepts: {},
+    performerProfiles: {},
+    productionAuditions: {},
+    auditionEntries: [],
+    linkRequests: [],
     ...seed,
   };
 }
@@ -136,6 +194,11 @@ export function emptyState(): Data {
     adminPin: '',
     setup: {},
     homeLayouts: {},
+    productionConcepts: {},
+    performerProfiles: {},
+    productionAuditions: {},
+    auditionEntries: [],
+    linkRequests: [],
     users: [],
     bookings: [],
     productions: [],
@@ -176,18 +239,76 @@ async function seatError(e: unknown, performanceId: string, seatIds: string[]): 
   throw e;
 }
 
+async function waitForDemoData() {
+  if (useStore.persist.hasHydrated()) return;
+  await new Promise<void>((resolve) => {
+    const unsubscribe = useStore.persist.onFinishHydration(() => {
+      unsubscribe();
+      resolve();
+    });
+  });
+}
+
 export const useStore = create<AppState>()(
   persist(
     (set, get) => {
       const patchPerf = (id: string, fn: (p: Performance) => Performance) =>
         set((s) => ({ performances: s.performances.map((p) => (p.id === id ? fn(p) : p)) }));
       const me = () => get().currentUserId;
+      const requireConceptPlanner = (productionId: string) => {
+        const { productions, users } = get();
+        const production = productions.find((p) => p.id === productionId);
+        const user = users.find((u) => u.id === me());
+        if (!production || !user || !canPlanProduction(production, user)) throw new Error('You need Concept planning access for this production.');
+        return production;
+      };
+      const patchDemoConcept = (productionId: string, patch: (concept: ConceptWorkspace) => Partial<ConceptWorkspace>) =>
+        set((s) => {
+          const concept = s.productionConcepts[productionId] ?? EMPTY_CONCEPT;
+          return { productionConcepts: { ...s.productionConcepts, [productionId]: { ...concept, ...patch(concept) } } };
+        });
+      const requireAuditionReviewer = (productionId: string) => {
+        const { productions, users } = get();
+        const production = productions.find((p) => p.id === productionId);
+        const user = users.find((u) => u.id === me());
+        if (!production || !user || !canReviewAudition(production, user)) throw new Error('You need audition review access for this production.');
+        return user;
+      };
       const seats = (performanceId: string): Slice => `seats:${performanceId}`;
+      const requireProductionManager = (id: string) => {
+        const { productions, users } = get();
+        const production = productions.find((p) => p.id === id);
+        const user = users.find((u) => u.id === me());
+        if (!production || !user || !canManageProduction(production, user)) throw new Error('Only a director or the venue owner can edit this production.');
+        return user;
+      };
+      const manageProduction = async (id: string, write: () => Promise<unknown>, update: (p: Production) => Production) => {
+        requireProductionManager(id);
+        const who = me();
+        if (LIVE) await write();
+        if (me() !== who) return;
+        set((s) => ({ productions: s.productions.map((p) => p.id === id ? update(p) : p) }));
+        if (LIVE) void refresh(['productions']).catch(() => {});
+      };
 
       return {
         ...(LIVE ? emptyState() : fresh()),
 
         switchUser: (id) => set({ currentUserId: id }),
+        approveLink: async (authUserId) => {
+          if (!LIVE) return;
+          await api.approveLinkRequest(authUserId);
+          await refresh(['links', 'people']);
+        },
+        declineLink: async (authUserId) => {
+          if (!LIVE) return;
+          await api.declineLinkRequest(authUserId);
+          await refresh(['links']);
+        },
+        deleteMyAccount: async () => {
+          if (!LIVE) throw new Error('There’s no account to delete in the demo.');
+          await api.deleteMyAccount();
+        },
         resetDemo: () => {
           if (LIVE) return;
           const f = fresh();
@@ -229,6 +350,8 @@ export const useStore = create<AppState>()(
           set((s) => ({
             users: s.users.filter((u) => u.id !== id),
             productions: s.productions.map((p) => ({ ...p, members: p.members.filter((m) => m.userId !== id) })),
+            performerProfiles: Object.fromEntries(Object.entries(s.performerProfiles).filter(([personId]) => personId !== id)),
+            auditionEntries: s.auditionEntries.filter((entry) => entry.personId !== id),
           }));
           push('the removal', ['people', 'productions'], () => api.deletePerson(id));
         },
@@ -248,7 +371,16 @@ export const useStore = create<AppState>()(
           if (parsed?.app !== 'dream-theatre' || !data || !Array.isArray(data.bookings) || !Array.isArray(data.users) || !data.settings) throw new Error('This file is not a Dream Theatre export.');
           const house: HouseConfig = data.house ?? DEFAULT_HOUSE;
           configureHouse(house);
-          set((s) => ({ ...data, house, settings: { ...DEFAULT_SETTINGS, ...data.settings }, currentUserId: data.users.some((u: User) => u.id === s.currentUserId) ? s.currentUserId : OWNER_ID }));
+          set((s) => ({
+            ...data,
+            house,
+            settings: { ...DEFAULT_SETTINGS, ...data.settings },
+            currentUserId: data.users.some((u: User) => u.id === s.currentUserId) ? s.currentUserId : OWNER_ID,
+            productionConcepts: data.productionConcepts ?? {},
+            performerProfiles: data.performerProfiles ?? {},
+            productionAuditions: data.productionAuditions ?? {},
+            auditionEntries: data.auditionEntries ?? [],
+          }));
         },
         updateVenue: (v) => {
           set((s) => ({ venue: { ...s.venue, ...v } }));
@@ -317,17 +449,228 @@ export const useStore = create<AppState>()(
           push('the payment', ['bookings'], () => api.addPayment(bookingId, p), true);
         },
 
-        createProduction: (p) => {
-          const prod: Production = { ...p, id: uid('p_') };
+        loadPerformerProfile: async (personId) => {
+          if (LIVE) return api.loadPerformerProfile(personId);
+          await waitForDemoData();
+          const { auditionEntries, productions, users, performerProfiles } = get();
+          const viewer = users.find((user) => user.id === me());
+          const canView = personId === viewer?.id || (viewer && auditionEntries.some((entry) =>
+            entry.personId === personId && productions.some((p) => p.id === entry.productionId && canReviewAudition(p, viewer)),
+          ));
+          return canView ? performerProfiles[personId] ?? null : null;
+        },
+        savePerformerProfile: async (profile) => {
+          const validationError = performerProfileError(profile);
+          if (validationError) throw new Error(validationError);
+          const personId = me();
+          if (LIVE) return api.savePerformerProfile(personId, profile);
+          await waitForDemoData();
+          if (personId !== me()) throw new Error('Your account changed. Reopen your performer profile.');
+          set((s) => ({ performerProfiles: { ...s.performerProfiles, [personId]: profile } }));
+        },
+        loadAuditions: async () => {
+          if (LIVE) return api.loadAuditions();
+          await waitForDemoData();
+          const { productions, productionAuditions, auditionEntries } = get();
+          return {
+            openings: productions.flatMap((p) => {
+              const audition = productionAuditions[p.id];
+              return audition?.isOpen ? [{ productionId: p.id, title: p.title, details: audition.details }] : [];
+            }),
+            applications: auditionEntries.flatMap((entry) => {
+              if (entry.personId !== me()) return [];
+              const production = productions.find((p) => p.id === entry.productionId);
+              return production ? [{ productionId: production.id, title: production.title, submittedAt: entry.submittedAt }] : [];
+            }).sort((a, b) => b.submittedAt.localeCompare(a.submittedAt)),
+          };
+        },
+        applyForAudition: async (productionId) => {
+          if (LIVE) return api.applyForAudition(productionId);
+          await waitForDemoData();
+          const { productions, performerProfiles, productionAuditions, auditionEntries, users } = get();
+          const person = users.find((user) => user.id === me());
+          if (!person) throw new Error('Sign in to apply.');
+          if (!hasPerformerProfile(performerProfiles[person.id] ?? null)) throw new Error('Save your performer profile before applying.');
+          if (auditionEntries.some((entry) => entry.productionId === productionId && entry.personId === person.id)) return;
+          if (!productions.some((p) => p.id === productionId) || !productionAuditions[productionId]?.isOpen) {
+            throw new Error('Auditions are closed for this production.');
+          }
+          set((s) => ({ auditionEntries: [
+            ...s.auditionEntries, { productionId, personId: person.id, name: person.name, submittedAt: new Date().toISOString() },
+          ] }));
+        },
+        withdrawAudition: async (productionId) => {
+          if (LIVE) return api.withdrawAudition(productionId, me());
+          await waitForDemoData();
+          set((s) => ({ auditionEntries: s.auditionEntries.filter((entry) => entry.productionId !== productionId || entry.personId !== s.currentUserId) }));
+        },
+        loadConcept: async (productionId) => {
+          if (!LIVE) await waitForDemoData();
+          requireConceptPlanner(productionId);
+          return LIVE ? api.loadConcept(productionId) : get().productionConcepts[productionId] ?? EMPTY_CONCEPT;
+        },
+        saveConceptBrief: async (productionId, brief) => {
+          if (!LIVE) await waitForDemoData();
+          requireConceptPlanner(productionId);
+          if (LIVE) return api.saveConceptBrief(productionId, brief);
+          patchDemoConcept(productionId, () => ({ brief }));
+        },
+        saveConceptAuditionDraft: async (productionId, auditionDraft) => {
+          if (!LIVE) await waitForDemoData();
+          requireConceptPlanner(productionId);
+          if (LIVE) return api.saveConceptAuditionDraft(productionId, auditionDraft);
+          patchDemoConcept(productionId, () => ({ auditionDraft }));
+        },
+        saveFeasibilityCheck: async (productionId, check) => {
+          if (!LIVE) await waitForDemoData();
+          const production = requireConceptPlanner(productionId);
+          if (check.assigneeId && !production.members.some((member) => member.userId === check.assigneeId)) {
+            throw new Error('Assign this check to a company member.');
+          }
+          if (LIVE) return api.saveFeasibilityCheck(productionId, check);
+          patchDemoConcept(productionId, (concept) => ({ checks: [...concept.checks.filter((entry) => entry.item !== check.item), check] }));
+        },
+        loadProductionAudition: async (productionId) => {
+          if (LIVE) return api.loadProductionAudition(productionId);
+          await waitForDemoData();
+          requireProductionManager(productionId);
+          return get().productionAuditions[productionId] ?? null;
+        },
+        saveProductionAudition: async (productionId, audition) => {
+          if (!LIVE) await waitForDemoData();
+          requireProductionManager(productionId);
+          const next = { ...audition, details: audition.details.trim() };
+          if (next.details.length > AUDITION_DETAILS_LIMIT) throw new Error(`Keep audition details to ${AUDITION_DETAILS_LIMIT} characters.`);
+          if (LIVE) return api.saveProductionAudition(productionId, next);
+          set((s) => ({ productionAuditions: { ...s.productionAuditions, [productionId]: next } }));
+        },
+        loadAuditionReviewCards: async (productionId, filter, offset) => {
+          if (LIVE) return api.loadAuditionReviewCards(productionId, filter, offset);
+          await waitForDemoData();
+          requireAuditionReviewer(productionId);
+          const { auditionEntries, performerProfiles, users } = get();
+          return auditionEntries
+            .filter((entry) => entry.productionId === productionId && (filter === 'all' || (entry.decision ?? 'pending') === filter))
+            .sort((a, b) => a.submittedAt.localeCompare(b.submittedAt) || a.personId.localeCompare(b.personId))
+            .slice(offset, offset + AUDITION_REVIEW_PAGE_SIZE + 1)
+            .flatMap(({ personId, name, submittedAt, decision }) => {
+              const profile = performerProfiles[personId];
+              return profile ? [{
+                personId, name: users.find((user) => user.id === personId)?.name ?? name, submittedAt,
+                headshot: profile.headshot, summary: auditionSummary(profile.skills, profile.credits[0]), decision: decision ?? 'pending',
+              }] : [];
+            });
+        },
+        saveAuditionReview: async (productionId, personId, expected, decision) => {
+          if (LIVE) return api.saveAuditionReview(productionId, personId, expected, decision);
+          await waitForDemoData();
+          requireAuditionReviewer(productionId);
+          const matches = (entry: AppState['auditionEntries'][number]) => entry.productionId === productionId && entry.personId === personId;
+          const application = get().auditionEntries.find(matches);
+          if (!application) throw new Error('This application is no longer available.');
+          const current = application.decision ?? 'pending';
+          if (current === decision) return;
+          if (current !== expected) throw new Error('The audition decision changed. Refresh and try again.');
+          set((s) => ({ auditionEntries: s.auditionEntries.map((entry) => matches(entry) ? { ...entry, decision } : entry) }));
+        },
+        loadAuditionFeedback: async (productionId, personId) => {
+          if (LIVE) return api.loadAuditionFeedback(productionId, personId);
+          await waitForDemoData();
+          requireAuditionReviewer(productionId);
+          return get().auditionEntries.find((entry) => entry.productionId === productionId && entry.personId === personId)?.feedback ?? [];
+        },
+        addAuditionFeedback: async (productionId, personId, entry) => {
+          const body = entry.body.trim();
+          if (!body || body.length > AUDITION_FEEDBACK_LIMIT[entry.kind]) throw new Error('Enter feedback within the character limit.');
+          if (LIVE) return api.addAuditionFeedback(productionId, personId, { ...entry, body });
+          await waitForDemoData();
+          const reviewer = requireAuditionReviewer(productionId);
+          const matches = (application: AppState['auditionEntries'][number]) =>
+            application.productionId === productionId && application.personId === personId;
+          const application = get().auditionEntries.find(matches);
+          if (!application) throw new Error('This application is no longer available.');
+          const existing = application.feedback?.find((item) => item.id === entry.id);
+          if (existing) return existing;
+          const feedback = { ...entry, body, authorName: reviewer.name, createdAt: new Date().toISOString() };
+          set((s) => ({
+            auditionEntries: s.auditionEntries.map((item) => matches(item) ? { ...item, feedback: [feedback, ...(item.feedback ?? [])] } : item),
+          }));
+          return feedback;
+        },
+
+        createProduction: async (p) => {
+          const who = me();
+          if (get().users.find((u) => u.id === who)?.role !== 'owner') throw new Error('Only the venue owner can start a production.');
+          const prod: Production = {
+            ...p,
+            id: uid('p_'),
+            stage: 'concept',
+            milestones: [],
+            members: [{ userId: who, groupIds: [], part: 'Director / Producer', isDirector: true }],
+          };
           const channels: Channel[] = [
             { id: uid('ch_'), productionId: prod.id, name: 'Announcements', kind: 'announcements' },
             { id: uid('ch_'), productionId: prod.id, name: 'Full Company', kind: 'group' },
             ...prod.groups.map((g) => ({ id: uid('ch_'), productionId: prod.id, name: g.name, kind: 'group' as const, groupId: g.id })),
           ];
-          set((s) => ({ productions: [...s.productions, prod], channels: [...s.channels, ...channels] }));
-          push('the production', ['productions', 'channels'], () => api.insertProduction(prod, channels));
+          if (LIVE) await api.insertProduction(prod, channels);
+          if (me() === who) {
+            set((s) => ({
+              productions: [...s.productions.filter((x) => x.id !== prod.id), prod],
+              channels: [...s.channels.filter((x) => x.productionId !== prod.id), ...channels],
+            }));
+            if (LIVE) void refresh(['productions', 'channels']).catch(() => {});
+          }
           return prod;
         },
+        updateProductionPitch: (id, pitch) => manageProduction(id, () => api.updateProductionPitch(id, pitch), (p) => ({ ...p, pitch })),
+        changeProductionStage: async (id, expected, stage) => {
+          const author = requireProductionManager(id);
+          const slices = ['productions', 'channels', 'messages'] satisfies Slice[];
+          if (LIVE) {
+            try {
+              await api.changeProductionStage(id, expected, stage);
+              if (me() === author.id) set((s) => ({
+                productions: s.productions.map((p) => p.id === id ? { ...p, stage } : p),
+              }));
+            } finally {
+              if (me() === author.id) void refresh(slices).catch(() => {});
+            }
+            return;
+          }
+
+          const state = get();
+          const current = productionStage(state.productions.find((p) => p.id === id)!);
+          if (current === stage) return;
+          if (current !== expected) throw new Error('The production stage changed. Review the current stage and try again.');
+          const existing = state.channels.find((c) => c.productionId === id && c.kind === 'announcements' && !c.groupId);
+          const channel: Channel = existing ?? { id: uid('ch_'), productionId: id, name: 'Announcements', kind: 'announcements' };
+          const message: Message = {
+            id: uid('m_'), channelId: channel.id, userId: author.id,
+            text: `Production stage changed from ${STAGE_LABELS[current]} to ${STAGE_LABELS[stage]}.`,
+            at: new Date().toISOString(), productionStage: stage,
+          };
+          set((s) => ({
+            productions: s.productions.map((p) => p.id === id ? { ...p, stage } : p),
+            channels: existing ? s.channels : [...s.channels, channel],
+            messages: [...s.messages, message],
+          }));
+        },
+        updateProductionRun: (id, dates) => manageProduction(id, () => api.updateProductionRun(id, dates), (p) => ({ ...p, ...dates })),
+        addMilestone: (productionId, milestone) => {
+          const next: ProductionMilestone = { ...milestone, id: uid('ms_'), completed: false };
+          return manageProduction(productionId, () => api.insertMilestone(productionId, next), (p) => ({
+            ...p, milestones: [...(p.milestones ?? []).filter((m) => m.id !== next.id), next],
+          }));
+        },
+        updateMilestone: (productionId, id, patch) =>
+          manageProduction(productionId, () => api.updateMilestone(productionId, id, patch), (p) => ({
+            ...p, milestones: p.milestones?.map((m) => m.id === id ? { ...m, ...patch } : m),
+          })),
+        removeMilestone: (productionId, id) =>
+          manageProduction(productionId, () => api.deleteMilestone(productionId, id), (p) => ({
+            ...p, milestones: p.milestones?.filter((m) => m.id !== id),
+          })),
         upsertScheduleItem: (item) => {
           const existing = item.id ? get().schedule.find((x) => x.id === item.id) : undefined;
           const next: ScheduleItem = { ...item, id: item.id ?? uid('s_'), rsvps: existing?.rsvps ?? {} };
@@ -352,31 +695,44 @@ export const useStore = create<AppState>()(
           set((s) => ({ conflicts: s.conflicts.filter((c) => c.id !== id) }));
           push('the change', ['conflicts'], () => api.deleteConflict(id));
         },
-        addMember: (productionId, user, groupIds, part) => {
-          const u: User = { ...user, id: uid('u_'), role: 'member', color: COLORS[get().users.length % COLORS.length] };
+        addMember: async (productionId, user, groupIds, part) => {
+          requireProductionManager(productionId);
+          const existing = get().users.find((u) => u.email.toLowerCase() === user.email.toLowerCase());
+          const u: User = existing ?? { ...user, id: uid('u_'), role: 'member', color: COLORS[get().users.length % COLORS.length] };
+          if (LIVE) {
+            await api.addMember(productionId, u, groupIds, part);
+            void refresh(['people', 'productions']).catch(() => {});
+            return;
+          }
           set((s) => ({
-            users: [...s.users, u],
-            productions: s.productions.map((p) => (p.id === productionId ? { ...p, members: [...p.members, { userId: u.id, groupIds, part }] } : p)),
+            users: existing ? s.users : [...s.users, u],
+            productions: s.productions.map((p) => {
+              if (p.id !== productionId) return p;
+              const member = p.members.find((m) => m.userId === u.id);
+              const next = { ...member, userId: u.id, groupIds, part: part ?? member?.part };
+              return { ...p, members: member ? p.members.map((m) => m.userId === u.id ? next : m) : [...p.members, next] };
+            }),
           }));
-          push(u.name, ['people', 'productions'], () => api.addMember(productionId, u, groupIds, part), true);
         },
-        setMemberGroups: (productionId, userId, groupIds) => {
-          set((s) => ({
-            productions: s.productions.map((p) =>
-              p.id === productionId ? { ...p, members: p.members.map((m) => (m.userId === userId ? { ...m, groupIds } : m)) } : p,
-            ),
+        updateCompanyMember: async (productionId, userId, patch) => {
+          if (patch.isDirector !== undefined && requireProductionManager(productionId).role !== 'owner') {
+            throw new Error('Only the venue owner can change director access.');
+          }
+          return manageProduction(productionId, () => api.updateCompanyMember(productionId, userId, patch), (p) => ({
+            ...p, members: p.members.map((m) => m.userId === userId ? { ...m, ...patch } : m),
           }));
-          push('the groups', ['productions'], () => api.setMemberGroups(productionId, userId, groupIds));
         },
-        addGroup: (productionId, name) => {
+        addGroup: async (productionId, name) => {
+          const who = requireProductionManager(productionId).id;
           const g = { id: uid('g_'), name, color: COLORS[Math.floor(Math.random() * COLORS.length)] };
           const channel: Channel = { id: uid('ch_'), productionId, name, kind: 'group', groupId: g.id };
+          if (LIVE) await api.addGroup(productionId, g, channel.id);
+          if (me() !== who) return;
           set((s) => ({
-            productions: s.productions.map((p) => (p.id === productionId ? { ...p, groups: [...p.groups, g] } : p)),
-            channels: [...s.channels, channel],
+            productions: s.productions.map((p) => p.id === productionId && !p.groups.some((x) => x.id === g.id) ? { ...p, groups: [...p.groups, g] } : p),
+            channels: s.channels.some((c) => c.id === channel.id) ? s.channels : [...s.channels, channel],
           }));
-          const groups = get().productions.find((p) => p.id === productionId)?.groups ?? [g];
-          push('the group', ['productions', 'channels'], () => api.addGroup(productionId, groups, channel));
+          if (LIVE) void refresh(['productions', 'channels']).catch(() => {});
         },
         sendMessage: (channelId, text) => {
           const msg: Message = { id: uid('m_'), channelId, userId: me(), text: text.trim(), at: new Date().toISOString() };
@@ -385,9 +741,11 @@ export const useStore = create<AppState>()(
           push('your message', ['messages'], () => api.sendMessage(msg));
         },
         markRead: (channelId) => {
-          const at = new Date().toISOString();
-          set((s) => ({ lastRead: { ...s.lastRead, [`${me()}:${channelId}`]: at } }));
           const who = me();
+          const key = `${who}:${channelId}`;
+          const at = get().messages.reduce((latest, m) => m.channelId === channelId && m.at > latest ? m.at : latest, '');
+          if (!at || at <= (get().lastRead[key] ?? '')) return;
+          set((s) => ({ lastRead: { ...s.lastRead, [key]: at } }));
           push(null, ['reads'], () => api.markRead(who, channelId, at));
         },
         openDirect: (productionId, otherUserId) => {
@@ -518,6 +876,7 @@ export const useStore = create<AppState>()(
 const DATA_KEYS = [
   'currentUserId', 'venue', 'settings', 'users', 'bookings', 'productions', 'schedule', 'conflicts',
   'channels', 'messages', 'lastRead', 'performances', 'orders', 'tickets', 'house', 'adminPin', 'setup', 'homeLayouts',
+  'productionConcepts', 'performerProfiles', 'productionAuditions', 'auditionEntries', 'linkRequests',
 ] as const;
 
 function pickData(s: AppState): Data {

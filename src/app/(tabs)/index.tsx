@@ -3,6 +3,7 @@ import { Fragment } from 'react';
 import { Linking, Platform, View } from 'react-native';
 
 import { HomeWidget } from '@/components/HomeWidgets';
+import { ProductionUpdates } from '@/components/ProductionUpdates';
 import { Button, Empty, Screen, Txt } from '@/components/ui';
 import { MONTHS, WEEKDAYS } from '@/lib/dates';
 import { APK_URL } from '@/lib/links';
@@ -25,6 +26,9 @@ export default function Home() {
         <Txt v="h1">{first ? `${hello}, ${first}` : hello}</Txt>
         {user.role === 'renter' ? <Txt v="muted" style={{ fontStyle: 'italic' }}>{venue.tagline}</Txt> : null}
       </View>
+
+      <ProductionUpdates />
+      <Button variant="secondary" icon="mic-outline" title="Find auditions" onPress={() => router.push('/auditions')} />
 
       {layout.widgets.length === 0 ? (
         <Empty icon="apps-outline" title="Your home screen is empty" body="Add the sections you want to see first." />

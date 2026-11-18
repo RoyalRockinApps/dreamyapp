@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import { FlatList, KeyboardAvoidingView, Platform, Pressable, TextInput, View } from 'react-native';
 
-import { Avatar, Empty, Txt } from '@/components/ui';
+import { ProductionStageBadge } from '@/components/ProductionStage';
+import { Avatar, Button, Empty, Txt } from '@/components/ui';
 import { canPost, canSeeChannel } from '@/hooks/useChannels';
 import { fmtTime, relativeDay, sameDay } from '@/lib/dates';
 import { usePoll } from '@/store/sync';
@@ -24,12 +25,14 @@ export default function ChatScreen() {
 
   const messages = useMemo(() => allMessages.filter((m) => m.channelId === id), [allMessages, id]);
   const reversed = useMemo(() => [...messages].reverse(), [messages]);
+  const latestMessageAt = messages.at(-1)?.at;
+  const visible = !!channel && canSeeChannel(channel, production, user);
 
-  useEffect(() => {
-    if (channel) markRead(channel.id);
-  }, [channel, messages.length, markRead]);
+  useFocusEffect(useCallback(() => {
+    if (visible && latestMessageAt) markRead(id);
+  }, [id, latestMessageAt, markRead, visible]));
 
-  if (!channel || !canSeeChannel(channel, production, user)) return <Empty icon="lock-closed-outline" title="Conversation not available" />;
+  if (!channel || !visible) return <Empty icon="lock-closed-outline" title="Conversation not available" />;
 
   const other = channel.kind === 'direct' ? users.find((u) => u.id === channel.memberIds?.find((x) => x !== user.id)) : undefined;
   const title = other?.name ?? channel.name;
@@ -42,6 +45,9 @@ export default function ChatScreen() {
       <Stack.Screen options={{ title }} />
       <View style={{ paddingHorizontal: 16, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.border }}>
         <Txt v="small">{`${production?.title ?? ''} · ${channel.kind === 'announcements' ? 'Directors post, everyone reads' : `${memberCount} members`}`}</Txt>
+        {channel.kind === 'announcements' && production && (
+          <Button small variant="ghost" title="View production timeline" onPress={() => router.push(`/production/${production.id}`)} />
+        )}
       </View>
       <FlatList
         inverted
@@ -71,6 +77,7 @@ export default function ChatScreen() {
                       paddingHorizontal: 12,
                       paddingVertical: 8,
                     }}>
+                    {item.productionStage && <ProductionStageBadge stage={item.productionStage} />}
                     <Txt color={mine ? '#1A1206' : C.text}>{item.text}</Txt>
                     <Txt v="small" color={mine ? '#5A4515' : C.faint} style={{ alignSelf: 'flex-end', fontSize: 10, marginTop: 2 }}>{fmtTime(item.at)}</Txt>
                   </View>

@@ -5,6 +5,7 @@ import type { HouseConfig } from '../seating';
 import type {
   Booking,
   Channel,
+  LinkRequest,
   MemberConflict,
   Message,
   Order,
@@ -12,6 +13,7 @@ import type {
   Performance,
   PriceTier,
   Production,
+  ProductionMilestone,
   Quote,
   RentalSettings,
   Rsvp,
@@ -94,9 +96,24 @@ export interface ProductionRow {
   title: string;
   tagline: Nullable<string>;
   color: string;
-  opening_date: string;
-  closing_date: string;
+  opening_date: Nullable<string>;
+  closing_date: Nullable<string>;
   groups: Production['groups'];
+}
+
+export interface ProductionPlanRow {
+  production_id: string;
+  stage: NonNullable<Production['stage']>;
+  pitch: Nullable<string>;
+}
+
+export interface ProductionMilestoneRow {
+  id: string;
+  production_id: string;
+  stage: ProductionMilestone['stage'];
+  title: string;
+  due_date: Nullable<string>;
+  completed: boolean;
 }
 
 export interface MembershipRow {
@@ -105,6 +122,8 @@ export interface MembershipRow {
   group_ids: string[];
   part: Nullable<string>;
   is_director: boolean;
+  can_review_auditions?: boolean;
+  can_plan_concept?: boolean;
 }
 
 export interface ScheduleRow {
@@ -149,6 +168,7 @@ export interface MessageRow {
   person_id: string;
   body: string;
   at: string;
+  production_stage?: Message['productionStage'] | null;
 }
 
 export interface ReadRow {
@@ -349,18 +369,25 @@ export function busyToSchedule(r: BusyRow): ScheduleItem {
 
 // ---------- productions ----------
 
-export function toProduction(r: ProductionRow, members: MembershipRow[] = []): Production {
+export function toProduction(r: ProductionRow, members: MembershipRow[] = [], plan?: ProductionPlanRow, milestones: ProductionMilestone[] = []): Production {
   return {
     id: r.id,
     title: r.title,
     tagline: opt(r.tagline),
     color: r.color,
-    openingDate: iso(r.opening_date),
-    closingDate: iso(r.closing_date),
+    openingDate: isoOpt(r.opening_date),
+    closingDate: isoOpt(r.closing_date),
+    ...(plan ? { stage: plan.stage, pitch: opt(plan.pitch) } : {}),
+    ...(milestones.length ? { milestones } : {}),
     groups: r.groups ?? [],
     members: members
       .filter((m) => m.production_id === r.id)
-      .map((m) => ({ userId: m.person_id, groupIds: m.group_ids ?? [], part: opt(m.part), ...(m.is_director ? { isDirector: true } : {}) })),
+      .map((m) => ({
+        userId: m.person_id, groupIds: m.group_ids ?? [], part: opt(m.part),
+        ...(m.is_director ? { isDirector: true } : {}),
+        ...(m.can_review_auditions ? { canReviewAuditions: true } : {}),
+        ...(m.can_plan_concept ? { canPlanConcept: true } : {}),
+      })),
   };
 }
 
@@ -370,14 +397,25 @@ export function fromProduction(p: Partial<Production>): Partial<ProductionRow> {
   if (p.title !== undefined) row.title = p.title;
   if ('tagline' in p) row.tagline = p.tagline ?? null;
   if (p.color !== undefined) row.color = p.color;
-  if (p.openingDate !== undefined) row.opening_date = p.openingDate;
-  if (p.closingDate !== undefined) row.closing_date = p.closingDate;
+  if ('openingDate' in p) row.opening_date = p.openingDate ?? null;
+  if ('closingDate' in p) row.closing_date = p.closingDate ?? null;
   if (p.groups !== undefined) row.groups = p.groups;
   return row;
 }
 
+export const toMilestone = (r: ProductionMilestoneRow): ProductionMilestone => ({
+  id: r.id,
+  stage: r.stage,
+  title: r.title,
+  dueDate: opt(r.due_date),
+  completed: r.completed,
+});
+
 export function fromMembership(productionId: string, m: Production['members'][number]): MembershipRow {
-  return { production_id: productionId, person_id: m.userId, group_ids: m.groupIds, part: m.part ?? null, is_director: !!m.isDirector };
+  return {
+    production_id: productionId, person_id: m.userId, group_ids: m.groupIds, part: m.part ?? null,
+    is_director: !!m.isDirector, can_review_auditions: !!m.canReviewAuditions, can_plan_concept: !!m.canPlanConcept,
+  };
 }
 
 export function toScheduleItem(r: ScheduleRow, rsvps: RsvpRow[] = []): ScheduleItem {
@@ -435,7 +473,10 @@ export function fromChannel(c: Channel): ChannelRow {
 }
 
 export function toMessage(r: MessageRow): Message {
-  return { id: r.id, channelId: r.channel_id, userId: r.person_id, text: r.body, at: iso(r.at) };
+  return {
+    id: r.id, channelId: r.channel_id, userId: r.person_id, text: r.body, at: iso(r.at),
+    ...(r.production_stage ? { productionStage: r.production_stage } : {}),
+  };
 }
 
 export function toLastRead(rows: ReadRow[]): Record<string, string> {
@@ -523,4 +564,19 @@ export function unavailableSeats(message: string): string[] | null {
   const m = /seats_unavailable:\s*(.*)$/.exec(message);
   if (!m) return null;
   return m[1].split(',').map((s) => s.trim()).filter((s) => /^.+-[LCR]\d+$/.test(s));
+}
+
+// ---------- accounts ----------
+
+export interface LinkRequestRow {
+  auth_user_id: string;
+  person_id: string;
+  email: string;
+  name: Nullable<string>;
+  declined: boolean;
+  requested_at: string;
+}
+
+export function toLinkRequest(r: LinkRequestRow): LinkRequest {
+  return { authUserId: r.auth_user_id, personId: r.person_id, email: r.email, name: opt(r.name), declined: r.declined, requestedAt: iso(r.requested_at) };
 }

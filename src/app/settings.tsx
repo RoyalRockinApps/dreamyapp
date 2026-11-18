@@ -7,7 +7,7 @@ import { APK_URL, WEB_URL } from '@/lib/links';
 import { MEMBER_ID, OWNER_ID, RENTER_ID } from '@/lib/seed';
 import { LIVE } from '@/lib/backend';
 import { signOut } from '@/store/sync';
-import { useCurrentUser, useStore } from '@/store/useStore';
+import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
 const PERSONAS = [
@@ -18,6 +18,7 @@ const PERSONAS = [
 
 export default function Settings() {
   const user = useCurrentUser();
+  const deleteMyAccount = useStore((st) => st.deleteMyAccount);
   const users = useStore((s) => s.users);
   const switchUser = useStore((s) => s.switchUser);
   const resetDemo = useStore((s) => s.resetDemo);
@@ -38,16 +39,43 @@ export default function Settings() {
         </Row>
       </Card>
 
+      <Button variant="secondary" icon="person-outline" title="My performer profile" onPress={() => router.push('/performer-profile')} />
+
       {LIVE && (
         <Button
           variant="secondary"
           icon="log-out-outline"
           title="Sign out"
           onPress={() =>
-            alert('Sign out?', 'You’ll need a new email code to sign back in.', [
+            alert('Sign out?', 'Sign back in with your email and password.', [
               { text: 'Cancel', style: 'cancel' },
               { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
             ])
+          }
+        />
+      )}
+      {LIVE && (
+        <Button
+          variant="danger"
+          icon="trash-outline"
+          title="Delete my account"
+          onPress={() =>
+            alert(
+              'Delete your account?',
+              'This permanently deletes your sign-in, performer profile, auditions and company memberships, and removes your name and contact details. Bookings and ticket records stay with the theatre without your details. This can’t be undone.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete account',
+                  style: 'destructive',
+                  onPress: () => {
+                    deleteMyAccount()
+                      .then(() => signOut())
+                      .catch((e) => alert('Couldn’t delete your account', errorMessage(e)));
+                  },
+                },
+              ],
+            )
           }
         />
       )}

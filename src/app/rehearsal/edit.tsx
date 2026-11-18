@@ -1,14 +1,15 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { Button, Card, Chips, Empty, Field, Row, Screen, SectionHeader, Txt, tap } from '@/components/ui';
 import { addDays, addMinutes, atMinutes, dayKey, fmtDate, fmtMinutes, fmtTime } from '@/lib/dates';
+import { canManageProduction } from '@/lib/production';
 import { findConflicts, memberConflictsFor, stageBusy } from '@/lib/scheduling';
 import { SCHEDULE_KINDS, SPACES, type ScheduleKind, type Space } from '@/lib/types';
-import { useStore } from '@/store/useStore';
+import { useCurrentUser, useStore } from '@/store/useStore';
 import { C, R } from '@/theme';
 import { alert } from '@/components/alert';
 
@@ -18,7 +19,8 @@ const REPEATS = [1, 2, 4, 6, 8] as const;
 
 export default function EditCall() {
   const params = useLocalSearchParams<{ id?: string; productionId?: string; date?: string }>();
-  const productions = useStore((s) => s.productions);
+  const user = useCurrentUser();
+  const productions = useStore((s) => s.productions).filter((p) => canManageProduction(p, user));
   const schedule = useStore((s) => s.schedule);
   const bookings = useStore((s) => s.bookings);
   const conflicts = useStore((s) => s.conflicts);
@@ -47,10 +49,10 @@ export default function EditCall() {
   const [repeat, setRepeat] = useState<(typeof REPEATS)[number]>(1);
 
   const production = productions.find((p) => p.id === productionId);
-  const busy = useMemo(() => stageBusy(bookings, schedule, new Date(), existing?.id), [bookings, schedule, existing?.id]);
 
   if (!production) return <Empty icon="people-outline" title="Create a production first" />;
 
+  const busy = stageBusy(bookings, schedule, new Date(), existing?.id);
   const occurrences = Array.from({ length: existing ? 1 : repeat }, (_, i) => {
     const s = atMinutes(dayKey(addDays(atMinutes(day, 0), i * 7)), startMin);
     return { start: s, end: addMinutes(s, duration) };
@@ -139,7 +141,7 @@ export default function EditCall() {
         )}
       </Card>
 
-      <Button title={existing ? 'Save changes' : occurrences.length > 1 ? `Schedule ${occurrences.length - blocked} calls` : 'Schedule & notify company'} icon="checkmark" onPress={save} />
+      <Button title={existing ? 'Save changes' : occurrences.length > 1 ? `Schedule ${occurrences.length - blocked} calls` : 'Schedule call'} icon="checkmark" onPress={save} />
       {existing && (
         <Button
           variant="danger"

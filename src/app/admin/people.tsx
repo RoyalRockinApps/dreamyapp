@@ -5,7 +5,8 @@ import { AdminPage, Grid } from '@/components/admin';
 import { alert } from '@/components/alert';
 import { Avatar, Button, Card, Chips, Field, Pill, Row, SectionHeader, Segmented, Txt } from '@/components/ui';
 import type { Role, User } from '@/lib/types';
-import { useCurrentUser, useStore } from '@/store/useStore';
+import { LIVE } from '@/lib/backend';
+import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
 const ROLE_LABEL: Record<Role, string> = { owner: 'Owner / staff', renter: 'Renter', member: 'Cast & crew' };
@@ -63,9 +64,12 @@ export default function AdminPeople() {
         ))}
         {list.length === 0 && <Txt v="muted">No one here yet.</Txt>}
       </Card>
+      <LinkRequests />
       <SectionHeader title="About sign-in" />
       <Txt v="small">
-        In this demo build everyone shares one device’s data and you switch personas in Settings. When the backend is connected (docs/BACKEND.md), each person here gets an email invite and their own login with exactly these permissions.
+        {LIVE
+          ? 'Everyone creates their own account in the app with an email and password. A new email becomes a renter right away. When someone creates an account with an email that matches a person here, you confirm it’s really them under “Accounts to confirm” before they get that person’s access. Forgotten passwords are reset in the Supabase dashboard (Authentication → Users).'
+          : 'In this demo build everyone shares one device’s data and you switch personas in Settings.'}
       </Txt>
     </AdminPage>
   );
@@ -119,5 +123,35 @@ function PersonRow({ u, shows, ownerCount }: { u: User; shows: string[]; ownerCo
         </View>
       )}
     </View>
+  );
+}
+
+/** Sign-ins whose email matches someone here: the owner confirms it's really them before linking. */
+function LinkRequests() {
+  const requests = useStore((s) => s.linkRequests);
+  const users = useStore((s) => s.users);
+  const approveLink = useStore((s) => s.approveLink);
+  const declineLink = useStore((s) => s.declineLink);
+  const open = requests.filter((r) => !r.declined);
+  if (!LIVE || open.length === 0) return null;
+  const act = (fn: () => Promise<void>) => fn().catch((e) => alert('Couldn’t update the account', errorMessage(e)));
+  return (
+    <>
+      <SectionHeader title={`Accounts to confirm · ${open.length}`} />
+      <Txt v="small">These sign-ins use the email of someone you already have. Confirm only if you know it’s really them; declining keeps them out of that person’s record.</Txt>
+      {open.map((r) => {
+        const person = users.find((u) => u.id === r.personId);
+        return (
+          <Card key={r.authUserId} accent={C.warn}>
+            <Txt v="h3">{`${r.name || r.email} wants to sign in as ${person?.name ?? 'someone on file'}`}</Txt>
+            <Txt v="small">{`${r.email}${person ? ` · ${ROLE_LABEL[person.role]}` : ''} · requested ${new Date(r.requestedAt).toLocaleString()}`}</Txt>
+            <Row style={{ justifyContent: 'flex-end' }}>
+              <Button small variant="secondary" title="Decline" onPress={() => alert('Decline this account?', `${r.email} won’t get ${person?.name ?? 'this person'}’s access.`, [{ text: 'Cancel', style: 'cancel' }, { text: 'Decline', style: 'destructive', onPress: () => void act(() => declineLink(r.authUserId)) }])} />
+              <Button small icon="checkmark" title="Confirm" onPress={() => void act(() => approveLink(r.authUserId))} />
+            </Row>
+          </Card>
+        );
+      })}
+    </>
   );
 }
