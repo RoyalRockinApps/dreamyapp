@@ -1,14 +1,14 @@
--- The Dream Theatre: live backend (Neon Postgres + Neon Auth + Neon Data API).
+-- The Dream Theatre: live backend (Supabase: Postgres, Auth, PostgREST API, Realtime).
 --
 -- Ids are text so they match the app's own ids (src/lib/ids.ts) one-to-one.
 -- Everything that must never be decided by a phone (seat sales, check-in, payments that confirm a
 -- booking) goes through the security-definer functions at the bottom of this file. Plain tables are
 -- guarded by row-level security.
 
--- Neon Data API roles: `authenticated` (signed in, Neon Auth JWT) and `anonymous` (no token).
--- auth.uid() / auth.jwt() come from Neon's pg_session_jwt extension.
+-- API roles: `authenticated` (signed in, Supabase Auth JWT) and `anon` (no token).
+-- auth.uid() returns the signed-in user's id (auth.users.id).
 create schema if not exists private;
-grant usage on schema private to anonymous, authenticated;
+grant usage on schema private to anon, authenticated;
 create schema if not exists extensions;
 create extension if not exists pgcrypto with schema extensions;
 
@@ -28,7 +28,7 @@ create table public.venue_config (
 
 -- Everyone the theatre knows: owners, renters, cast & crew. A person exists before they ever sign
 -- in (the owner or a director adds them); signing in with the same, verified email links the
--- account (link_me()). auth_user_id is the Neon Auth user id (neon_auth."user".id).
+-- account (link_me(); see the accounts migration). auth_user_id is the Supabase Auth user id (auth.users.id).
 create table public.people (
   id text primary key,
   auth_user_id uuid unique,
@@ -381,7 +381,7 @@ alter table public.orders enable row level security;
 alter table public.tickets enable row level security;
 
 -- venue profile, rates and seating are public information
-create policy "config: anyone reads" on public.venue_config for select to anonymous, authenticated using (true);
+create policy "config: anyone reads" on public.venue_config for select to anon, authenticated using (true);
 create policy "config: owner edits" on public.venue_config for update to authenticated
   using ((select private.is_owner())) with check ((select private.is_owner()));
 
@@ -471,13 +471,13 @@ create policy "messages: post as myself" on public.messages for insert to authen
 create policy "reads: mine" on public.channel_reads for all to authenticated
   using (person_id = (select private.me())) with check (person_id = (select private.me()));
 
-create policy "performances: anyone reads" on public.performances for select to anonymous, authenticated using (true);
+create policy "performances: anyone reads" on public.performances for select to anon, authenticated using (true);
 create policy "performances: owner adds" on public.performances for insert to authenticated with check ((select private.is_owner()));
 create policy "performances: owner edits" on public.performances for update to authenticated
   using ((select private.is_owner())) with check ((select private.is_owner()));
 create policy "performances: owner removes" on public.performances for delete to authenticated using ((select private.is_owner()));
 
-create policy "seats: anyone reads" on public.seat_claims for select to anonymous, authenticated using (true);
+create policy "seats: anyone reads" on public.seat_claims for select to anon, authenticated using (true);
 -- seat_claims are only written by hold_seats(), release_seats(), purchase_seats(), block_seats(), refund_ticket()
 
 create policy "orders: owner and buyer read" on public.orders for select to authenticated
@@ -488,12 +488,11 @@ create policy "tickets: owner and buyer read" on public.tickets for select to au
     select 1 from public.orders o where o.id = order_id and o.buyer_id = (select private.me())));
 
 -- ============================================================================================
--- Server functions the app calls (Data API: POST /rpc/<name>)
+-- Server functions the app calls (PostgREST: POST /rest/v1/rpc/<name>)
 -- ============================================================================================
 
--- Called right after sign-in. Links the Neon Auth account to the person with that email, or adds a
--- new renter. Only verified emails are linked (signing in with an emailed code verifies it), so
--- nobody can claim the owner's record by typing the owner's address.
+-- Called right after sign-in. First version: links a verified email to the matching person or adds a
+-- new renter. Replaced by the owner-approved version in 20261118000008_accounts_realtime.sql.
 create function public.link_me()
 returns text
 language plpgsql security definer set search_path = '' as $$
@@ -508,7 +507,8 @@ begin
   select id into v_pid from public.people where auth_user_id = v_uid;
   if v_pid is not null then return v_pid; end if;
 
-  select u.email, u.name, u."emailVerified" into v_email, v_name, v_verified from neon_auth."user" u where u.id = v_uid;
+  select u.email, u.raw_user_meta_data ->> 'name', u.email_confirmed_at is not null into v_email, v_name, v_verified
+    from auth.users u where u.id = v_uid;
   if v_email is null then raise exception 'We couldn''t find your account. Sign in again.'; end if;
   if not coalesce(v_verified, false) then raise exception 'Confirm your email address with a sign-in code first.'; end if;
 
@@ -777,12 +777,12 @@ begin
 end $$;
 
 -- ============================================================================================
--- Privileges for the Data API roles (row-level security above decides which rows)
+-- Privileges for the API roles (row-level security above decides which rows)
 -- ============================================================================================
 
-grant usage on schema public to anonymous, authenticated;
+grant usage on schema public to anon, authenticated;
 grant select, insert, update, delete on all tables in schema public to authenticated;
-grant select on public.venue_config, public.performances, public.seat_claims to anonymous;
+grant select on public.venue_config, public.performances, public.seat_claims to anon;
 
 -- Only signed-in people may call the app's functions; the private helpers stay internal.
 revoke execute on function
@@ -790,11 +790,11 @@ revoke execute on function
   public.purchase_seats(text, text[], text, text, text), public.refund_ticket(text),
   public.block_seats(text, text[], boolean, text), public.check_in(text, text),
   public.add_payment(text, numeric, text, text, text), public.add_member(text, text, text, text, text[], text, text)
-  from public, anonymous;
+  from public, anon;
 grant execute on function
   public.link_me(), public.stage_busy(), public.hold_seats(text, text[], int), public.release_seats(text, text[]),
   public.purchase_seats(text, text[], text, text, text), public.refund_ticket(text),
   public.block_seats(text, text[], boolean, text), public.check_in(text, text),
   public.add_payment(text, numeric, text, text, text), public.add_member(text, text, text, text, text[], text, text)
   to authenticated;
-revoke execute on function private.guard_performance_delete() from public, anonymous, authenticated;
+revoke execute on function private.guard_performance_delete() from public, anon, authenticated;

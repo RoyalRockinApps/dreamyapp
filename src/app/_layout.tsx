@@ -9,6 +9,7 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { LiveGate } from '@/components/LiveGate';
 import { LIVE } from '@/lib/backend';
@@ -50,33 +51,39 @@ export default function RootLayout() {
   }
 
   return (
-    <ThemeProvider value={theme}>
-      <StatusBar style="light" />
-      <Stack
-        screenOptions={{
-          headerStyle: { backgroundColor: C.bg },
-          headerTintColor: C.accent,
-          headerTitleStyle: { color: C.text, fontFamily: F.display },
-          headerShadowVisible: false,
-          headerBackButtonDisplayMode: 'minimal',
-          contentStyle: { backgroundColor: C.bg },
-        }}>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="booking/new" options={{ title: 'Book the Theatre', presentation: 'modal' }} />
-        <Stack.Screen name="booking/[id]" options={{ title: 'Booking' }} />
-        <Stack.Screen name="pay" options={{ title: 'Secure Payment', presentation: 'modal' }} />
-        <Stack.Screen name="production/[id]" options={{ title: 'Production' }} />
-        <Stack.Screen name="production/new" options={{ title: 'New Production', presentation: 'modal' }} />
-        <Stack.Screen name="rehearsal/edit" options={{ title: 'Schedule a Call', presentation: 'modal' }} />
-        <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
-        <Stack.Screen name="performance/[id]" options={{ title: 'Choose Seats' }} />
-        <Stack.Screen name="performance/new" options={{ title: 'New Performance', presentation: 'modal' }} />
-        <Stack.Screen name="ticket/[id]" options={{ title: 'Your Ticket' }} />
-        <Stack.Screen name="checkin/[id]" options={{ title: 'Door Check-in' }} />
-        <Stack.Screen name="settings" options={{ title: 'Settings' }} />
-        <Stack.Screen name="customize" options={{ title: 'Customize home', presentation: 'modal' }} />
-        <Stack.Screen name="admin" options={{ headerShown: false }} />
-      </Stack>
-    </ThemeProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <ThemeProvider value={theme}>
+        <StatusBar style="light" />
+        <Stack
+          screenOptions={{
+            headerStyle: { backgroundColor: C.bg },
+            headerTintColor: C.accent,
+            headerTitleStyle: { color: C.text, fontFamily: F.display },
+            headerShadowVisible: false,
+            headerBackButtonDisplayMode: 'minimal',
+            contentStyle: { backgroundColor: C.bg },
+          }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="booking/new" options={{ title: 'Book the Theatre', presentation: 'modal' }} />
+          <Stack.Screen name="booking/[id]" options={{ title: 'Booking' }} />
+          <Stack.Screen name="pay" options={{ title: 'Secure Payment', presentation: 'modal' }} />
+          <Stack.Screen name="production/[id]" options={{ title: 'Production' }} />
+          <Stack.Screen name="production/new" options={{ title: 'New Production', presentation: 'modal' }} />
+          <Stack.Screen name="production/concept" options={{ title: 'Concept Workspace' }} />
+          <Stack.Screen name="production/audition-review" options={{ title: 'Audition Review' }} />
+          <Stack.Screen name="auditions" options={{ title: 'Auditions' }} />
+          <Stack.Screen name="performer-profile" options={{ title: 'Performer Profile' }} />
+          <Stack.Screen name="rehearsal/edit" options={{ title: 'Schedule a Call', presentation: 'modal' }} />
+          <Stack.Screen name="chat/[id]" options={{ title: 'Chat' }} />
+          <Stack.Screen name="performance/[id]" options={{ title: 'Choose Seats' }} />
+          <Stack.Screen name="performance/new" options={{ title: 'New Performance', presentation: 'modal' }} />
+          <Stack.Screen name="ticket/[id]" options={{ title: 'Your Ticket' }} />
+          <Stack.Screen name="checkin/[id]" options={{ title: 'Door Check-in' }} />
+          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+          <Stack.Screen name="customize" options={{ title: 'Customize home', presentation: 'modal' }} />
+          <Stack.Screen name="admin" options={{ headerShown: false }} />
+        </Stack>
+      </ThemeProvider>
+    </GestureHandlerRootView>
   );
 }

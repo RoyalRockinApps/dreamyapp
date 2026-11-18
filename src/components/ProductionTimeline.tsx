@@ -1,0 +1,277 @@
+import { router } from 'expo-router';
+import { useState } from 'react';
+import { View } from 'react-native';
+
+import { alert } from '@/components/alert';
+import { formatProductionDay, ProductionDatePicker, ProductionRunFields } from '@/components/ProductionDates';
+import { PRODUCTION_STAGE_STYLE, ProductionStageTrack } from '@/components/ProductionStage';
+import { Button, Card, Chips, Collapsible, Field, ListItem, Pill, ProgressBar, Row, Txt } from '@/components/ui';
+import { useNow } from '@/hooks/useAgenda';
+import { useConceptWorkspace } from '@/hooks/useConceptWorkspace';
+import { auditionDraftDetails, FEASIBILITY_LABELS, unresolvedFeasibility } from '@/lib/concept';
+import { dayKey, fmtRange } from '@/lib/dates';
+import { canManageProduction, canPlanProduction, canReviewAudition, PRODUCTION_STATUSES, productionRunDates, productionStage, productionStageLabel, STAGE_LABELS } from '@/lib/production';
+import { isCalled } from '@/lib/scheduling';
+import { FEASIBILITY_ITEMS, PRODUCTION_STAGES, type MilestoneStage, type Production, type ProductionMilestone, type ProductionStage } from '@/lib/types';
+import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
+import { C } from '@/theme';
+
+const STAGE_GUIDE: Record<MilestoneStage, string> = {
+  concept: 'Pitch, rights, budget, and venue',
+  casting: 'Auditions, callbacks, and casting',
+  preparation: 'Read-through, rehearsals, and design',
+  production: 'Tech, dress, performances, and strike',
+};
+
+export function ProductionTimeline({ production: p, onSchedule }: {
+  production: Production;
+  onSchedule: (callId: string) => void;
+}) {
+  const user = useCurrentUser();
+  const schedule = useStore((s) => s.schedule);
+  const announcements = useStore((s) => s.channels.find((c) => c.productionId === p.id && c.kind === 'announcements'));
+  const updatePitch = useStore((s) => s.updateProductionPitch);
+  const changeStage = useStore((s) => s.changeProductionStage);
+  const updateRun = useStore((s) => s.updateProductionRun);
+  const addMilestone = useStore((s) => s.addMilestone);
+  const updateMilestone = useStore((s) => s.updateMilestone);
+  const removeMilestone = useStore((s) => s.removeMilestone);
+  const [saving, setSaving] = useState(false);
+  const [stageChoice, setStageChoice] = useState<{ from: ProductionStage; to: ProductionStage }>();
+  const [editingPitch, setEditingPitch] = useState(false);
+  const [pitch, setPitch] = useState(p.pitch ?? '');
+  const [editingRun, setEditingRun] = useState(false);
+  const [opening, setOpening] = useState('');
+  const [closing, setClosing] = useState('');
+  const [editor, setEditor] = useState<{ stage: MilestoneStage; milestone?: ProductionMilestone }>();
+  const now = useNow(60_000);
+  const today = dayKey(now);
+  const canEdit = canManageProduction(p, user);
+  const stage = productionStage(p);
+  const canPlan = canPlanProduction(p, user);
+  const reviewConcept = stageChoice?.from === 'concept';
+  const { concept, loadError, loading, refresh: refreshConcept } = useConceptWorkspace(p.id, canPlan && (stage === 'concept' || reviewConcept));
+  const unresolved = concept ? unresolvedFeasibility(concept) : [];
+  const blockers = concept?.checks.filter((check) => check.status === 'blocked') ?? [];
+  const draftDetails = reviewConcept && concept ? auditionDraftDetails(concept.auditionDraft) : '';
+  const stageStyle = PRODUCTION_STAGE_STYLE[stage];
+  const nextStage = stage === 'completed' ? undefined : PRODUCTION_STATUSES[PRODUCTION_STATUSES.indexOf(stage) + 1];
+  const milestones = p.milestones ?? [];
+  const done = milestones.filter((m) => m.completed).length;
+  const sorted = milestones.slice().sort((a, b) =>
+    Number(a.completed) - Number(b.completed) || (a.dueDate ?? '9999').localeCompare(b.dueDate ?? '9999') || a.title.localeCompare(b.title),
+  );
+  const nextMilestone = sorted.find((m) => !m.completed && m.dueDate);
+  const next = schedule
+    .filter((s) => s.productionId === p.id && new Date(s.end) >= now && (canEdit || isCalled(s, p, user.id)))
+    .sort((a, b) => a.start.localeCompare(b.start))[0];
+
+  const save = async (write: () => Promise<void>, finish?: () => void) => {
+    setSaving(true);
+    try {
+      await write();
+      finish?.();
+    } catch (error) {
+      alert('Couldn’t save the production plan', errorMessage(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const chooseStage = (value: ProductionStage) => {
+    if (value === stage || saving) return;
+    if (stage === 'concept') void refreshConcept();
+    setStageChoice({ from: stage, to: value });
+  };
+
+  return (
+    <View style={{ gap: 12 }}>
+      <Card accent={stageStyle.color}>
+        <View style={{ backgroundColor: stageStyle.bg, borderRadius: 12, padding: 12, gap: 6 }}>
+          <Txt v="label" color={stageStyle.color}>Current stage</Txt>
+          <Txt v="h2">{productionStageLabel(stage)}</Txt>
+          {stage !== 'completed' && <Txt v="small">{STAGE_GUIDE[stage]}</Txt>}
+        </View>
+        <ProductionStageTrack stage={stage} />
+        {milestones.length > 0 ? (
+          <>
+            <Txt v="small">{`${done} of ${milestones.length} milestones complete`}</Txt>
+            <ProgressBar value={done / milestones.length} color={stageStyle.color} />
+          </>
+        ) : <Txt v="small">No milestones yet.</Txt>}
+        {nextMilestone?.dueDate && (
+          <Txt v="small" color={nextMilestone.dueDate < today ? C.warn : C.muted}>
+            {`${nextMilestone.dueDate < today ? 'Overdue' : 'Next deadline'} · ${nextMilestone.title} · ${formatProductionDay(nextMilestone.dueDate)}`}
+          </Txt>
+        )}
+        {next && <ListItem icon="time-outline" title={next.title} subtitle={fmtRange(next.start, next.end)} onPress={() => onSchedule(next.id)} />}
+        {canPlan && stage === 'concept' && !stageChoice && (
+          <>
+            {concept && <Txt v="small">{`${FEASIBILITY_ITEMS.length - unresolved.length} of ${FEASIBILITY_ITEMS.length} feasibility checks ready`}</Txt>}
+            {blockers.length > 0 && <Txt v="small" color={C.warn}>{`Blocked · ${blockers.map(({ item }) => FEASIBILITY_LABELS[item]).join(', ')}`}</Txt>}
+          </>
+        )}
+        {canPlan && <Button small variant="secondary" icon="clipboard-outline" title="Open Concept workspace" onPress={() => router.push({ pathname: '/production/concept', params: { productionId: p.id } })} />}
+        {canEdit && nextStage && !stageChoice && (
+          <Button
+            icon="arrow-forward-outline"
+            title={nextStage === 'completed' ? 'Mark production complete' : `Advance to ${STAGE_LABELS[nextStage]}`}
+            disabled={saving}
+            onPress={() => chooseStage(nextStage)}
+          />
+        )}
+        {canEdit && stageChoice && (
+          <View style={{ gap: 8 }}>
+            <Txt v="h3">{`Move from ${STAGE_LABELS[stageChoice.from]} to ${STAGE_LABELS[stageChoice.to]}?`}</Txt>
+            <Txt v="small">This posts a stage update for the whole company.</Txt>
+            {reviewConcept && (loading ? <Txt v="small">Checking Concept readiness…</Txt> : loadError ? (
+              <>
+                <Txt v="small" color={C.warn}>Couldn’t load Concept readiness.</Txt>
+                <Button small title="Retry readiness check" variant="ghost" onPress={() => void refreshConcept()} />
+              </>
+            ) : concept && (
+              <>
+                <Txt v="small" color={unresolved.length ? C.warn : C.green}>
+                  {unresolved.length ? `Still open · ${unresolved.map((item) => FEASIBILITY_LABELS[item]).join(', ')}` : 'All feasibility checks are ready.'}
+                </Txt>
+                <Txt v="label">Audition draft</Txt>
+                <Txt v="small">{draftDetails || 'No audition draft yet.'}</Txt>
+              </>
+            ))}
+            {stageChoice.to === 'completed' && done < milestones.length && <Txt v="small" color={C.warn}>{`${milestones.length - done} milestones are still open.`}</Txt>}
+            <Row style={{ flexWrap: 'wrap' }}>
+              <Button small title="Notify company and change stage" loading={saving} disabled={reviewConcept && loading} onPress={() => void save(
+                () => changeStage(p.id, stageChoice.from, stageChoice.to), () => setStageChoice(undefined),
+              )} />
+              <Button small variant="ghost" title="Cancel" disabled={saving} onPress={() => setStageChoice(undefined)} />
+            </Row>
+          </View>
+        )}
+        {announcements && <Button small variant="secondary" icon="megaphone-outline" title="Announcements" onPress={() => router.push(`/chat/${announcements.id}`)} />}
+      </Card>
+
+      {canEdit && (
+        <Collapsible title="Adjust stage" icon="flag-outline">
+          <Chips options={PRODUCTION_STATUSES} value={stage} onChange={chooseStage} labels={STAGE_LABELS} />
+        </Collapsible>
+      )}
+
+      {(!!p.pitch || canEdit) && (
+        <Collapsible title="Production pitch" icon="document-text-outline" defaultOpen={stage === 'concept'}>
+          {editingPitch && canEdit ? (
+            <>
+              <Field label="Pitch" value={pitch} onChangeText={setPitch} multiline editable={!saving} hint="Visible to the company." />
+              <Row>
+                <Button small title="Save pitch" loading={saving} onPress={() => void save(() => updatePitch(p.id, pitch.trim()), () => setEditingPitch(false))} />
+                <Button small variant="ghost" title="Cancel" disabled={saving} onPress={() => setEditingPitch(false)} />
+              </Row>
+            </>
+          ) : (
+            <>
+              {p.pitch ? <Txt>{p.pitch}</Txt> : <Txt v="small">No pitch yet.</Txt>}
+              {canEdit && <Button small variant="secondary" title="Edit pitch" onPress={() => {
+                setPitch(p.pitch ?? '');
+                setEditingPitch(true);
+              }} />}
+            </>
+          )}
+        </Collapsible>
+      )}
+
+      {canEdit && (
+        <Collapsible title="Run dates" subtitle={p.openingDate ? 'Opening and final performance' : 'No dates set'} icon="calendar-outline">
+          {editingRun ? (
+            <>
+              <ProductionRunFields opening={opening} closing={closing} setOpening={setOpening} setClosing={setClosing} />
+              <Row>
+                <Button small title="Save dates" loading={saving} onPress={() => void save(() => updateRun(p.id, productionRunDates(opening, closing, p)), () => setEditingRun(false))} />
+                <Button small variant="ghost" title="Cancel" disabled={saving} onPress={() => setEditingRun(false)} />
+              </Row>
+            </>
+          ) : <Button small variant="secondary" title="Edit run dates" onPress={() => {
+            setOpening(p.openingDate ? dayKey(p.openingDate) : '');
+            setClosing(p.closingDate ? dayKey(p.closingDate) : '');
+            setEditingRun(true);
+          }} />}
+        </Collapsible>
+      )}
+
+      {PRODUCTION_STAGES.map((phase, i) => {
+        const items = sorted.filter((m) => m.stage === phase);
+        const count = items.filter((m) => m.completed).length;
+        const current = phase === stage;
+        return (
+          <Collapsible
+            key={`${phase}:${current}`}
+            title={`Stage ${i} · ${STAGE_LABELS[phase]}${current ? ' (current)' : ''}`}
+            subtitle={items.length ? `${count} of ${items.length} complete` : STAGE_GUIDE[phase]}
+            icon={count > 0 && count === items.length ? 'checkmark-circle-outline' : 'flag-outline'}
+            defaultOpen={current}
+          >
+            {phase === 'casting' && canReviewAudition(p, user) && (
+              <Button small variant="secondary" icon="albums-outline" title="Review audition applicants" onPress={() => router.push({ pathname: '/production/audition-review', params: { productionId: p.id } })} />
+            )}
+            {items.map((m) => {
+              const overdue = !m.completed && !!m.dueDate && m.dueDate < today;
+              return (
+                <Card key={m.id} style={{ padding: 10 }}>
+                  <Row style={{ flexWrap: 'wrap' }}>
+                    <Txt v="h3" style={{ flexGrow: 1, flexShrink: 1 }}>{m.title}</Txt>
+                    {m.completed ? <Pill label="Done" color={C.green} bg={C.greenSoft} /> : overdue ? <Pill label="Overdue" color={C.warn} bg={C.surface2} /> : null}
+                  </Row>
+                  {m.dueDate && <Txt v="small">{formatProductionDay(m.dueDate)}</Txt>}
+                  {canEdit && (
+                    <Row style={{ flexWrap: 'wrap' }}>
+                      <Button small variant="secondary" title={m.completed ? 'Reopen' : 'Mark done'} disabled={saving} onPress={() => void save(() => updateMilestone(p.id, m.id, { completed: !m.completed }))} />
+                      <Button small variant="ghost" title="Edit" disabled={saving} onPress={() => setEditor({ stage: phase, milestone: m })} />
+                    </Row>
+                  )}
+                </Card>
+              );
+            })}
+            {canEdit && (editor?.stage === phase ? (
+              <MilestoneEditor
+                key={editor.milestone?.id ?? phase}
+                stage={phase}
+                milestone={editor.milestone}
+                saving={saving}
+                onCancel={() => setEditor(undefined)}
+                onSave={(fields) => {
+                  const id = editor.milestone?.id;
+                  return save(() => id ? updateMilestone(p.id, id, fields) : addMilestone(p.id, fields), () => setEditor(undefined));
+                }}
+                onRemove={(id) => alert('Remove this milestone?', undefined, [
+                  { text: 'Cancel', style: 'cancel' },
+                  { text: 'Remove', style: 'destructive', onPress: () => void save(() => removeMilestone(p.id, id), () => setEditor(undefined)) },
+                ])}
+              />
+            ) : <Button small variant="secondary" icon="add" title="Add milestone" disabled={saving} onPress={() => setEditor({ stage: phase })} />)}
+          </Collapsible>
+        );
+      })}
+    </View>
+  );
+}
+
+function MilestoneEditor({ stage, milestone, saving, onCancel, onSave, onRemove }: {
+  stage: MilestoneStage;
+  milestone?: ProductionMilestone;
+  saving: boolean;
+  onCancel: () => void;
+  onSave: (fields: Pick<ProductionMilestone, 'stage' | 'title' | 'dueDate'>) => Promise<void>;
+  onRemove: (id: string) => void;
+}) {
+  const [title, setTitle] = useState(milestone?.title ?? '');
+  const [dueDate, setDueDate] = useState(milestone?.dueDate ?? '');
+  return (
+    <View style={{ gap: 8 }}>
+      <Field label="Milestone" value={title} onChangeText={setTitle} maxLength={120} editable={!saving} placeholder="e.g. Confirm performance rights" />
+      <ProductionDatePicker label="Due date" value={dueDate} onChange={setDueDate} clearable />
+      <Row style={{ flexWrap: 'wrap' }}>
+        <Button small title="Save milestone" loading={saving} disabled={!title.trim()} onPress={() => void onSave({ stage, title: title.trim(), dueDate: dueDate || undefined })} />
+        <Button small variant="ghost" title="Cancel" disabled={saving} onPress={onCancel} />
+        {milestone && <Button small variant="danger" title="Remove" disabled={saving} onPress={() => onRemove(milestone.id)} />}
+      </Row>
+    </View>
+  );
+}

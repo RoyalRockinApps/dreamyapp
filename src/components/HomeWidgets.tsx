@@ -50,6 +50,7 @@ function ShortcutsWidget() {
 
 function NeedsWidget() {
   const bookings = useStore((s) => s.bookings);
+  const accounts = useStore((s) => s.linkRequests.filter((r) => !r.declined).length);
   const now = new Date();
   const todo = [
     ...bookings.filter((b) => b.status === 'inquiry').map((b) => ({ b, why: 'New request', color: C.blue })),
@@ -61,13 +62,16 @@ function NeedsWidget() {
   return (
     <>
       <SectionHeader title={todo.length ? `Needs you · ${todo.length}` : 'Needs you'} action={todo.length > 3 ? 'See all' : undefined} onAction={() => router.push('/rentals')} />
-      {todo.length === 0 ? (
+      {todo.length === 0 && accounts === 0 ? (
         <Card>
           <Txt v="muted">You’re all caught up.</Txt>
         </Card>
       ) : (
         <Group>
-          {todo.slice(0, 3).map(({ b, why, color }) => (
+          {accounts > 0 ? (
+            <Line dot={C.warn} title={`${accounts} account${accounts > 1 ? 's' : ''} to confirm`} detail="People & access" onPress={() => router.push('/admin/people')} />
+          ) : null}
+          {todo.slice(0, accounts > 0 ? 2 : 3).map(({ b, why, color }) => (
             <Line key={b.id} dot={color} title={b.title} detail={`${why} · ${fmtDate(b.start)}`} onPress={() => router.push(`/booking/${b.id}`)} />
           ))}
         </Group>

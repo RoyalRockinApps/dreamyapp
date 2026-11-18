@@ -24,7 +24,7 @@ export default function NewPerformance() {
   const [source, setSource] = useState<string>(params.bookingId ? `b:${params.bookingId}` : `p:${params.productionId ?? productions[0]?.id ?? ''}`);
   const prod = productions.find((p) => `p:${p.id}` === source);
   const book = bookings.find((b) => `b:${b.id}` === source) ?? booking;
-  const initialDay = book ? dayKey(book.start) : prod ? dayKey(prod.openingDate) : dayKey(new Date());
+  const initialDay = book ? dayKey(book.start) : prod?.openingDate ? dayKey(prod.openingDate) : dayKey(new Date());
 
   const [title, setTitle] = useState(book?.title ?? prod?.title ?? '');
   const [subtitle, setSubtitle] = useState('');
@@ -70,7 +70,7 @@ export default function NewPerformance() {
           const p = productions.find((x) => `p:${x.id}` === v);
           const b = bookings.find((x) => `b:${x.id}` === v);
           setTitle(p?.title ?? b?.title ?? '');
-          const k = b ? dayKey(b.start) : p ? dayKey(p.openingDate) : day;
+          const k = b ? dayKey(b.start) : p?.openingDate ? dayKey(p.openingDate) : day;
           setDay(k);
           const d = atMinutes(k, 0);
           setYm({ y: d.getFullYear(), m: d.getMonth() });

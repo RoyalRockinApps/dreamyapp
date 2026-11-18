@@ -40,6 +40,13 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Dream Theatre uses your selected photo as your performer headshot.",
+          "microphonePermission": false
+        }
+      ],
+      [
         "expo-camera",
         {
           "cameraPermission": "Dream Theatre uses the camera to scan tickets at the door.",
@@ -51,6 +58,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "1df1e21c-c61a-4311-8db6-a8f6afbf6234"
+      }
+    },
+    "owner": "b2mustangs-team"
   }
 }

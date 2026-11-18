@@ -12,6 +12,10 @@
       "distribution": "internal",
       "android": { "buildType": "apk" }
     },
+    "ios-simulator": {
+      "ios": { "simulator": true },
+      "env": { "EXPO_PUBLIC_DEMO": "1" }
+    },
     "production": {
       "autoIncrement": true
     }

@@ -1,12 +1,16 @@
 // Live mode: sign-in state, loading everything this person may see, and keeping it fresh.
 // Row-level security on the server decides what each person gets; this file just asks for it all.
-// Changes from other people arrive by checking every few seconds (usePoll / the background timer).
+// Other people's changes arrive through Supabase Realtime: a change to a table reloads the parts
+// of the state built from it. A full refresh every few minutes covers anything missed, and screens
+// that need it (seat picker, chat, door) re-check every few seconds while Realtime is down.
 
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useEffect } from 'react';
 import { AppState as RNAppState } from 'react-native';
 import { create } from 'zustand';
 
 import { LIVE } from '@/lib/backend';
+import * as api from '@/lib/remote/api';
 import * as auth from '@/lib/remote/auth';
 import { ALL_SLICES, setRefreshLoader, type BaseSlice, type Slice } from '@/lib/remote/bus';
 import { db } from '@/lib/remote/db';
@@ -15,9 +19,10 @@ import { configureHouse } from '@/lib/seating';
 import { DEFAULT_SETTINGS } from '@/lib/seed';
 import { emptyState, errorMessage, useStore, type AppState } from './useStore';
 
-type Status = 'starting' | 'signedOut' | 'loading' | 'ready' | 'error';
+type Status = 'starting' | 'signedOut' | 'loading' | 'pending' | 'ready' | 'error';
 
-export const useLive = create<{ status: Status; error?: string; email?: string }>(() => ({ status: LIVE ? 'starting' : 'ready' }));
+/** `pending`: signed in, waiting for the owner to confirm the account (message says why). */
+export const useLive = create<{ status: Status; error?: string; email?: string; message?: string }>(() => ({ status: LIVE ? 'starting' : 'ready' }));
 
 type Patch = Partial<AppState> | ((s: AppState) => Partial<AppState>);
 
@@ -55,8 +60,18 @@ const loaders: Record<BaseSlice, () => Promise<Patch>> = {
     return { bookings: [...b.map((r) => R.toBooking(r, p)), ...x.filter((k) => k.kind === 'booking').map(R.busyToBooking)] };
   },
   productions: async () => {
-    const [p, m] = await Promise.all([rows<R.ProductionRow>('productions', ['created_at', 'id']), rows<R.MembershipRow>('memberships', ['created_at', 'person_id'])]);
-    return { productions: p.map((r) => R.toProduction(r, m)) };
+    const [productions, members, plans, milestones] = await Promise.all([
+      rows<R.ProductionRow>('productions', ['created_at', 'id']),
+      rows<R.MembershipRow>('memberships', ['created_at', 'person_id']),
+      rows<R.ProductionPlanRow>('production_plans', ['production_id']),
+      rows<R.ProductionMilestoneRow>('production_milestones', ['id']),
+    ]);
+    const planByProduction = new Map(plans.map((p) => [p.production_id, p]));
+    return {
+      productions: productions.map((p) => R.toProduction(
+        p, members, planByProduction.get(p.id), milestones.filter((m) => m.production_id === p.id).map(R.toMilestone),
+      )),
+    };
   },
   schedule: async () => {
     const [s, r, x] = await Promise.all([rows<R.ScheduleRow>('schedule_items', ['starts_at', 'id']), rows<R.RsvpRow>('rsvps', ['item_id', 'person_id']), busy()]);
@@ -77,6 +92,8 @@ const loaders: Record<BaseSlice, () => Promise<Patch>> = {
     for (const r of await rows<R.HomeLayoutRow>('home_layouts', ['person_id'])) out[r.person_id] = r.layout;
     return { homeLayouts: out };
   },
+  // owner only (row-level security returns nothing to anyone else)
+  links: async () => ({ linkRequests: (await rows<R.LinkRequestRow>('link_requests', ['requested_at'])).map(R.toLinkRequest) }),
 };
 
 async function loadSeats(performanceId: string): Promise<Patch> {
@@ -128,20 +145,64 @@ function scheduleLoad(slices: Slice[]) {
   }, 250);
 }
 
-// Background checks while the app is open: most things every 20 s, seat maps (the biggest
-// download) every minute. Screens that need more (seat picker, chat, door) use usePoll().
-const BACKGROUND: Slice[] = ALL_SLICES.filter((s) => s !== 'performances' && s !== 'config');
-let ticks = 0;
+/** Which parts of the state to reload when a table changes. */
+const TABLE_SLICES: Record<string, Slice[]> = {
+  venue_config: ['config'],
+  people: ['people'],
+  bookings: ['bookings'],
+  payments: ['bookings'],
+  productions: ['productions'],
+  production_plans: ['productions'],
+  production_milestones: ['productions'],
+  memberships: ['productions', 'people', 'schedule', 'conflicts', 'channels', 'messages'],
+  schedule_items: ['schedule'],
+  rsvps: ['schedule'],
+  member_conflicts: ['conflicts'],
+  channels: ['channels', 'messages'],
+  messages: ['messages'],
+  performances: ['performances'],
+  orders: ['orders'],
+  tickets: ['tickets'],
+  link_requests: ['links'],
+};
+
+let channel: RealtimeChannel | null = null;
+let realtimeUp = false;
+
+function subscribe() {
+  unsubscribe();
+  let connectedOnce = false;
+  const ch = db().channel('theatre-live');
+  for (const table of [...Object.keys(TABLE_SLICES), 'seat_claims']) {
+    ch.on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
+      if (table !== 'seat_claims') return scheduleLoad(TABLE_SLICES[table]);
+      const row = (payload.new && Object.keys(payload.new).length ? payload.new : payload.old) as { performance_id?: string };
+      scheduleLoad(row?.performance_id ? [`seats:${row.performance_id}`] : ['performances']);
+    });
+  }
+  ch.subscribe((status) => {
+    realtimeUp = status === 'SUBSCRIBED';
+    if (!realtimeUp) return;
+    if (connectedOnce) scheduleLoad(ALL_SLICES); // catch up on anything missed while disconnected
+    connectedOnce = true;
+  });
+  channel = ch;
+}
+
+function unsubscribe() {
+  realtimeUp = false;
+  if (channel) db().removeChannel(channel).catch(() => {});
+  channel = null;
+}
+
+// Safety net: a full refresh every 5 minutes while the app is open.
 let poller: ReturnType<typeof setInterval> | null = null;
 
 function startPolling() {
   stopPolling();
-  ticks = 0;
   poller = setInterval(() => {
-    if (useLive.getState().status !== 'ready' || RNAppState.currentState === 'background') return;
-    ticks++;
-    scheduleLoad(ticks % 3 === 0 ? ALL_SLICES : BACKGROUND);
-  }, 20_000);
+    if (useLive.getState().status === 'ready' && RNAppState.currentState !== 'background') scheduleLoad(ALL_SLICES);
+  }, 5 * 60_000);
 }
 
 function stopPolling() {
@@ -149,7 +210,7 @@ function stopPolling() {
   poller = null;
 }
 
-/** While a screen is open, re-check these parts of the state every `ms` milliseconds. */
+/** While a screen is open and Realtime is down, re-check these parts of the state every `ms` milliseconds. */
 export function usePoll(slices: Slice[], ms: number) {
   const key = slices.join('|');
   useEffect(() => {
@@ -157,7 +218,7 @@ export function usePoll(slices: Slice[], ms: number) {
     const list = key.split('|') as Slice[];
     scheduleLoad(list);
     const id = setInterval(() => {
-      if (useLive.getState().status === 'ready' && RNAppState.currentState !== 'background') scheduleLoad(list);
+      if (!realtimeUp && useLive.getState().status === 'ready' && RNAppState.currentState !== 'background') scheduleLoad(list);
     }, ms);
     return () => clearInterval(id);
   }, [key, ms]);
@@ -172,20 +233,26 @@ async function onSession(session: auth.AuthSession | null) {
   if (!session) {
     authUserId = null;
     stopPolling();
+    unsubscribe();
     useStore.setState(emptyState());
-    useLive.setState({ status: 'signedOut', error: undefined, email: undefined });
+    useLive.setState({ status: 'signedOut', error: undefined, email: undefined, message: undefined });
     return;
   }
-  if (session.userId === authUserId && useLive.getState().status === 'ready') return;
+  // token refreshes and the initial-session event repeat the same sign-in
+  if (session.userId === authUserId && ['loading', 'pending', 'ready'].includes(useLive.getState().status)) return;
   authUserId = session.userId;
-  useLive.setState({ status: 'loading', error: undefined, email: session.email });
+  useLive.setState({ status: 'loading', error: undefined, email: session.email, message: undefined });
   try {
-    // links this sign-in to the person with the same (verified) email, or adds a new renter
-    const { data: personId, error } = await db().rpc('link_me');
-    if (error) throw new Error(error.message);
+    // which person this sign-in is: an existing person (once the owner confirms) or a new renter
+    const link = await api.linkMe();
     if (authUserId !== session.userId) return; // signed out meanwhile
-    useStore.setState({ currentUserId: personId as string });
+    if (!('person' in link)) {
+      useLive.setState({ status: 'pending', message: link.message });
+      return;
+    }
+    useStore.setState({ currentUserId: link.person });
     await load(ALL_SLICES);
+    subscribe();
     startPolling();
     useLive.setState({ status: 'ready' });
   } catch (e) {
@@ -198,13 +265,13 @@ export function startLive() {
   if (!LIVE || started) return;
   started = true;
   setRefreshLoader(load);
-  auth.onAuthChange((s) => void onSession(s));
-  auth.loadSession().then((s) => onSession(s), () => onSession(null));
+  auth.onAuthChange((s) => void onSession(s)); // also reports the saved session on startup
   RNAppState.addEventListener('change', (state) => {
     if (state === 'active' && useLive.getState().status === 'ready') scheduleLoad(ALL_SLICES);
   });
 }
 
+/** Try again after an error, or check whether the owner has confirmed a pending account. */
 export async function retryLive() {
   authUserId = null;
   await onSession(await auth.loadSession());
