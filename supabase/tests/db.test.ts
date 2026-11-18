@@ -1,7 +1,8 @@
 /// <reference types="node" />
-// Runs the migration and the demo seed on an in-process Postgres (PGlite) with small stand-ins for
-// what Neon provides (Data API roles, auth.uid() from the session JWT, the neon_auth."user" table),
-// then checks row-level security and the server functions as different people.
+// Runs the migrations and the demo seed on an in-process Postgres (PGlite) with small stand-ins for
+// what Supabase provides (the anon/authenticated roles and their default grants, auth.uid() from the
+// session JWT, the auth.users table, the realtime publication), then checks row-level security and
+// the server functions as different people.
 // Run with: npm run test:db
 import { PGlite } from '@electric-sql/pglite';
 import { pgcrypto } from '@electric-sql/pglite/contrib/pgcrypto';
@@ -21,7 +22,7 @@ const IDS = {
   maya: '00000000-0000-0000-0000-000000000003', // cast (Leads)
   ben: '00000000-0000-0000-0000-000000000004', // cast + director
   stranger: '00000000-0000-0000-0000-000000000005', // signed up, unknown to the theatre
-  impostor: '00000000-0000-0000-0000-000000000006', // account with someone else's email, never verified
+  impostor: '00000000-0000-0000-0000-000000000006', // account with someone else's email
 };
 type Who = keyof typeof IDS;
 
@@ -48,38 +49,62 @@ const sys = async (sql: string) => (await db.query<Row>(sql)).rows;
 
 before(async () => {
   await db.exec(`
-    create role anonymous nologin; create role authenticated nologin;
+    create role anon nologin; create role authenticated nologin; create role service_role nologin;
     create schema auth;
+    create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb not null default '{}', email_confirmed_at timestamptz);
     create function auth.uid() returns uuid language sql stable as $$
       select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid $$;
-    grant usage on schema auth to anonymous, authenticated;
-    create schema neon_auth;
-    create table neon_auth."user" (id uuid primary key, name text not null default '', email text not null, "emailVerified" boolean not null default false);
+    grant usage on schema auth to anon, authenticated;
+    create publication supabase_realtime;
+    grant usage on schema public to anon, authenticated;
+    -- Supabase's own defaults, which the first migration turns off
+    alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
+    alter default privileges in schema public grant all on functions to anon, authenticated, service_role;
   `);
-  const dir = join(__dirname, '..', 'migrations'); // db/migrations
+  const dir = join(__dirname, '..', 'migrations'); // supabase/migrations
   for (const f of readdirSync(dir).filter((x) => x.endsWith('.sql')).sort()) await db.exec(readFileSync(join(dir, f), 'utf8'));
   await db.exec(seedSql(OWNER_EMAIL, new Date(2026, 10, 5, 12)));
-  // Neon Auth accounts (signing in with an emailed code marks the email verified)
-  await db.exec(`insert into neon_auth."user" (id, email, "emailVerified") values
-    ('${IDS.owner}', '${OWNER_EMAIL.toUpperCase()}', true), ('${IDS.jordan}', 'jordan.ellis@example.com', true),
-    ('${IDS.maya}', 'maya.brooks@example.com', true), ('${IDS.ben}', 'ben.okafor@example.com', true),
-    ('${IDS.stranger}', 'new.person@example.org', true), ('${IDS.impostor}', 'grace.whitfield@example.com', false)`);
-  // the app calls link_me() right after sign-in
+  // Supabase Auth accounts (email + password; with no email sender, nothing proves who owns an address)
+  await db.exec(`insert into auth.users (id, email, raw_user_meta_data) values
+    ('${IDS.owner}', '${OWNER_EMAIL.toUpperCase()}', '{}'), ('${IDS.jordan}', 'jordan.ellis@example.com', '{}'),
+    ('${IDS.maya}', 'maya.brooks@example.com', '{}'), ('${IDS.ben}', 'ben.okafor@example.com', '{}'),
+    ('${IDS.stranger}', 'new.person@example.org', '{"name":"New Person"}'), ('${IDS.impostor}', 'grace.whitfield@example.com', '{}')`);
+  // one-time bootstrap: the very first owner is linked by hand (nobody else can approve them)
+  await db.exec(`update people set auth_user_id = '${IDS.owner}' where id = 'u_owner'`);
+  // the app calls link_me() right after sign-in; known emails wait for the owner, who approves them
+  for (const who of ['jordan', 'maya', 'ben'] as const) {
+    assert.equal((await as(who, `select link_me() ->> 'status' s`))[0].s, 'pending', `${who} waits for the owner`);
+    assert.equal((await as('owner', `select approve_link_request('${IDS[who]}')`)).error, undefined, `approve ${who}`);
+  }
   for (const who of ['owner', 'jordan', 'maya', 'ben', 'stranger'] as const) {
-    const r = await as(who, 'select link_me() id');
-    assert.equal(r.error, undefined, `${who}: ${r.error}`);
+    const r = await as(who, `select link_me() ->> 'person' id`);
+    assert.ok(!r.error && r[0].id, `${who}: ${r.error ?? JSON.stringify(r[0])}`);
   }
 });
 
-test('signing in links people by verified email, or creates a renter', async () => {
+test('a known email only links after the owner approves; a new email becomes a renter', async () => {
   const linked = await sys(`select id, role, name from people where auth_user_id is not null`);
-  assert.equal(linked.find((r) => r.id === 'u_owner')?.role, 'owner', 'owner email (any case) links to the owner');
-  assert.ok(linked.some((r) => r.id === 'u_maya'));
-  assert.equal(linked.find((r) => r.name === 'New Person')?.role, 'renter');
-  assert.equal((await as('maya', 'select link_me() id'))[0].id, 'u_maya', 'linking again returns the same person');
-  const impostor = await as('impostor', 'select link_me() id');
-  assert.match(impostor.error ?? '', /Confirm your email/, 'an unverified email cannot claim someone');
+  assert.equal(linked.find((r) => r.id === 'u_owner')?.role, 'owner');
+  assert.ok(linked.some((r) => r.id === 'u_maya'), 'approved cast member is linked');
+  assert.equal(linked.find((r) => r.name === 'New Person')?.role, 'renter', 'unknown email becomes a renter');
+  assert.equal((await as('maya', `select link_me() ->> 'person' id`))[0].id, 'u_maya', 'linking again returns the same person');
+
+  const claim = await as('impostor', `select link_me() ->> 'status' s`);
+  assert.equal(claim[0]?.s, 'pending', 'typing someone else’s email does not claim their record');
   assert.equal((await sys(`select auth_user_id from people where id = 'u_grace'`))[0].auth_user_id, null);
+  assert.equal(await count('owner', `select count(*) from link_requests where person_id = 'u_grace'`), 1, 'owner sees the request');
+  assert.equal(await count('maya', 'select count(*) from link_requests'), 0, 'nobody else sees requests');
+  assert.ok((await as('maya', `select approve_link_request('${IDS.impostor}')`)).error, 'only the owner approves');
+  assert.equal((await as('owner', `select decline_link_request('${IDS.impostor}')`)).error, undefined);
+  assert.equal((await as('impostor', `select link_me() ->> 'status' s`))[0].s, 'declined', 'declined stays declined');
+  assert.equal((await sys(`select auth_user_id from people where id = 'u_grace'`))[0].auth_user_id, null);
+});
+
+test('Supabase’s blanket grants are off: column-level limits still hold', async () => {
+  const anonTables = await sys(`select table_name from information_schema.role_table_grants where grantee = 'anon' and table_schema = 'public' group by 1 order by 1`);
+  assert.deepEqual(anonTables.map((r) => r.table_name), ['performances', 'seat_claims', 'venue_config'], 'anon can only read public info');
+  const plans = await sys(`select privilege_type from information_schema.role_table_grants where grantee = 'authenticated' and table_name = 'production_plans'`);
+  assert.deepEqual(plans.map((r) => r.privilege_type), ['SELECT'], 'no table-wide UPDATE on production_plans (only column grants)');
 });
 
 test('each person sees only what their role allows', async () => {
@@ -409,13 +434,23 @@ test('Concept planning is private and the audition draft needs a separate publis
 });
 
 test('signed-out visitors cannot call the app’s functions', async () => {
-  await db.exec(`begin; set local role anonymous;`);
+  await db.exec(`begin; set local role anon;`);
   await assert.rejects(db.query(`select hold_seats('perf_elf_1', array['A-C1'])`));
   await db.exec('rollback;');
-  await db.exec(`begin; set local role anonymous;`);
+  await db.exec(`begin; set local role anon;`);
   await assert.rejects(db.query('select * from list_open_auditions()'));
   await db.exec('rollback;');
-  await db.exec(`begin; set local role anonymous;`);
+  await db.exec(`begin; set local role anon;`);
   await assert.rejects(db.query('select * from production_concepts'));
   await db.exec('rollback;');
+});
+
+test('people can delete their own account; the last owner cannot', async () => {
+  assert.match((await as('owner', 'select delete_my_account()')).error ?? '', /only owner/, 'the last owner must hand over first');
+  const before = (await sys(`select id from people where auth_user_id = '${IDS.stranger}'`))[0].id;
+  assert.equal((await as('stranger', 'select delete_my_account()')).error, undefined);
+  assert.equal((await sys(`select count(*) c from auth.users where id = '${IDS.stranger}'`))[0].c, 0, 'sign-in removed');
+  const p = (await sys(`select name, email, phone, auth_user_id from people where id = '${before}'`))[0];
+  assert.deepEqual([p.name, p.auth_user_id, p.phone], ['Deleted account', null, null], 'personal details removed');
+  assert.match(p.email, /^deleted\+.+@invalid\.local$/);
 });

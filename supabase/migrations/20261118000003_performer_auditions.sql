@@ -152,7 +152,7 @@ $$;
 
 revoke execute on function private.valid_performer_credits(jsonb), private.valid_performer_skills(text[]),
   private.can_read_performer_profile(text), public.apply_for_audition(text), public.list_open_auditions(),
-  public.list_my_audition_applications(), public.list_audition_applicants(text) from public, anonymous;
+  public.list_my_audition_applications(), public.list_audition_applicants(text) from public, anon;
 grant execute on function private.valid_performer_credits(jsonb), private.valid_performer_skills(text[]),
   private.can_read_performer_profile(text), public.apply_for_audition(text), public.list_open_auditions(),
   public.list_my_audition_applications(), public.list_audition_applicants(text) to authenticated;

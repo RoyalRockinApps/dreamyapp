@@ -56,6 +56,6 @@ end
 $$;
 
 revoke execute on function public.list_audition_feedback(text, text),
-  public.add_audition_feedback(text, text, text, text, text) from public, anonymous;
+  public.add_audition_feedback(text, text, text, text, text) from public, anon;
 grant execute on function public.list_audition_feedback(text, text),
   public.add_audition_feedback(text, text, text, text, text) to authenticated;

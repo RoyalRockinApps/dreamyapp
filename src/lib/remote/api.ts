@@ -295,3 +295,13 @@ export function purchaseSeats(performanceId: string, seatIds: string[], buyer: {
 
 export const checkIn = (code: string, performanceId: string) =>
   rpc<{ ok: boolean; message: string; ticketId?: string }>('check_in', { p_code: code, p_performance: performanceId });
+
+// ---------- accounts ----------
+
+export type LinkResult = { person: string } | { status: 'pending' | 'declined'; message: string };
+
+/** Right after sign-in: which person this sign-in is, or that it waits on the owner. */
+export const linkMe = () => rpc<LinkResult>('link_me', {});
+export const approveLinkRequest = (authUserId: string) => rpc('approve_link_request', { p_auth_user: authUserId });
+export const declineLinkRequest = (authUserId: string) => rpc('decline_link_request', { p_auth_user: authUserId });
+export const deleteMyAccount = () => rpc('delete_my_account', {});

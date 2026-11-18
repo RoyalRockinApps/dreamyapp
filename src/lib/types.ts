@@ -415,3 +415,13 @@ export interface VenueInfo {
   email: string;
   tagline: string;
 }
+
+/** A sign-in waiting for the owner to confirm it belongs to an existing person (Supabase link_requests). */
+export interface LinkRequest {
+  authUserId: string;
+  personId: string;
+  email: string;
+  name?: string;
+  declined: boolean;
+  requestedAt: string;
+}

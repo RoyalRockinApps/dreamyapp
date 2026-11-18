@@ -5,6 +5,7 @@ import type { HouseConfig } from '../seating';
 import type {
   Booking,
   Channel,
+  LinkRequest,
   MemberConflict,
   Message,
   Order,
@@ -563,4 +564,19 @@ export function unavailableSeats(message: string): string[] | null {
   const m = /seats_unavailable:\s*(.*)$/.exec(message);
   if (!m) return null;
   return m[1].split(',').map((s) => s.trim()).filter((s) => /^.+-[LCR]\d+$/.test(s));
+}
+
+// ---------- accounts ----------
+
+export interface LinkRequestRow {
+  auth_user_id: string;
+  person_id: string;
+  email: string;
+  name: Nullable<string>;
+  declined: boolean;
+  requested_at: string;
+}
+
+export function toLinkRequest(r: LinkRequestRow): LinkRequest {
+  return { authUserId: r.auth_user_id, personId: r.person_id, email: r.email, name: opt(r.name), declined: r.declined, requestedAt: iso(r.requested_at) };
 }

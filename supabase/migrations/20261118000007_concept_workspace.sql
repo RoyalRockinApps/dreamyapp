@@ -7,7 +7,7 @@ language sql stable security definer set search_path = '' as $$
     where production_id = p_production and person_id = private.me() and can_plan_concept
   )
 $$;
-revoke execute on function private.can_plan_production(text) from public, anonymous;
+revoke execute on function private.can_plan_production(text) from public, anon;
 grant execute on function private.can_plan_production(text) to authenticated;
 
 create table public.production_concepts (

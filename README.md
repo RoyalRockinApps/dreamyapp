@@ -136,7 +136,7 @@ use `npx eas-cli@latest build -p android --profile production` with your own upl
 `eas.json` also has a `preview` profile that builds an APK on Expo's servers.
 
 > **The app and the website run the same code and share the same data** once the build has the
-> Neon settings (see *Live backend* below). A build without them runs the on-device demo, where
+> Supabase settings (see *Live backend* below). A build without them runs the on-device demo, where
 > each phone and browser keeps its own copy.
 
 ## Run and distribute on iOS
@@ -158,7 +158,11 @@ and requires no Apple signing credentials. Use a physical iPhone to test camera-
 
 To install on an iPhone through TestFlight, use the `production` build profile. This requires
 an Apple Developer Program team and App Store Connect access. For live data, set
-`NEON_AUTH_BASE_URL` and `NEON_DATA_API_URL` in the Expo project's `production` environment.
+`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in the Expo project's `production` environment.
+
+**App Review needs a way in.** A live build opens on the sign-in screen, so in App Store Connect →
+TestFlight → Test Information → Beta App Review Information, tick **Sign-in required** and enter the
+review account's email and password (an owner account that shows every feature; see *Live backend*).
 
 ```bash
 npx eas-cli@latest build --platform ios --profile production
@@ -174,9 +178,8 @@ npm install
 npx expo start          # press i (iOS simulator), a (Android emulator), or scan the QR with a dev build
 ```
 
-With no Neon settings the app runs the on-device demo. To run against the live backend, run
-`neon env pull` (or `neon init`) to write `.env.local`, which git ignores; `.env.example` lists what
-it contains. Set `EXPO_PUBLIC_DEMO=1` to force the demo anyway. Restart `npx expo start` after
+With no Supabase settings the app runs the on-device demo. To run against the live backend, copy
+`.env.example` to `.env.local` (git ignores it) and fill in the project URL and publishable key. Set `EXPO_PUBLIC_DEMO=1` to force the demo anyway. Restart `npx expo start` after
 changing env files.
 
 The app uses `expo-camera` for ticket scanning, which is included in Expo Go. For store builds:
@@ -216,64 +219,65 @@ src/
     performance/[id].tsx  seat map, holds, checkout, box office tools
     ticket/[id].tsx       QR ticket
     checkin/[id].tsx      door scanner
-    settings.tsx          sign out (live) or personas (demo), venue info
+    settings.tsx          sign out and delete account (live) or personas (demo), venue info
   lib/                    pure, unit-tested domain logic (no React)
     seating.ts            house layout, holds, atomic sale, orphan detection, best available
     pricing.ts            rental quotes, deposits, balances
     scheduling.ts         stage conflicts, open windows, member conflicts
     payments.ts           card validation + PaymentProvider interface (demo provider)
     seed.ts               demo data
-    backend.ts            Neon endpoints from app.config.js; LIVE is true when the build has them
-    remote/auth.ts        Neon Auth sign-in by emailed code (plain HTTP, works on iOS/Android/web)
-    remote/db.ts          Neon Data API client; attaches the signed-in person's token
+    backend.ts            Supabase URL + key from app.config.js; LIVE is true when the build has them
+    remote/auth.ts        Supabase Auth: email + password sign-in and account creation
+    remote/db.ts          the Supabase client (session kept in AsyncStorage on every platform)
     remote/rows.ts        database rows <-> app types (unit-tested)
     remote/api.ts         writes and server functions (holds, sales, check-in, payments)
-  store/useStore.ts       Zustand store. Every mutation is an action; in live mode it also writes to Neon
-  store/sync.ts           live mode: sign-in session, initial load, checking for changes
-  components/             UI kit, MonthCalendar, SeatMap, CardForm, LiveGate (email-code sign-in)
-db/migrations/            database schema, row-level security and server functions
-db/tests/                 those rules exercised as each role on an in-process Postgres
-scripts/db.ts             npm run db:migrate / db:seed against the Neon branch in .env.local
+  store/useStore.ts       Zustand store. Every mutation is an action; in live mode it also writes to Supabase
+  store/sync.ts           live mode: sign-in session, initial load, Realtime updates
+  components/             UI kit, MonthCalendar, SeatMap, CardForm, LiveGate (sign-in / create account)
+supabase/migrations/      database schema, row-level security and server functions (`npm run db:migrate`)
+supabase/config.toml      Supabase project settings, including auth (`supabase config push`)
+supabase/tests/           those rules exercised as each role on an in-process Postgres
+scripts/db.ts             npm run db:seed against the Supabase database in .env.local
 scripts/seed-sql.ts       turns the demo data into SQL for a fresh database
-neon.ts                   Neon project config: Neon Auth and the Data API (apply with `neon deploy`)
 docs/BACKEND.md           backend design, what's done and what's next (Stripe, push)
 ```
 
 Tune the house layout (rows, section widths, tiers, accessible spaces) in `src/lib/seating.ts → HOUSE`
 to match the real seating chart.
 
-## Live backend (Neon)
-The live app runs on a free [Neon](https://neon.com) project (Postgres in AWS us-east-1) with
-**Neon Auth** for sign-in and the **Neon Data API** for reads and writes.
+## Live backend (Supabase)
+The live app runs on a free [Supabase](https://supabase.com) project in the **DagerHappens**
+organization: Postgres, Supabase Auth, the PostgREST API and Realtime.
 
-Everyone signs in with a **one-time code emailed to them** (no passwords). The server decides what each
-person can see and do (row-level security): renters see only their own bookings and see other events
-as "Reserved", cast see only their own productions and chats, and only owners can open the admin
-portal, approve bookings, sell at the box office or check tickets in. Seat holds, ticket sales and
-check-in run as database functions, so two people can never buy the same seat, and ticket prices
-come from the server. The app checks for other people's changes every 20 seconds, and every few
-seconds on the seat picker, in chat and at the door.
+Everyone signs in with **email and password**; new people create their own account in the app. The
+server decides what each person can see and do (row-level security): renters see only their own
+bookings and see other events as "Reserved", cast see only their own productions and chats, and only
+owners can open the admin portal, approve bookings, sell at the box office or check tickets in. Seat
+holds, ticket sales and check-in run as database functions, so two people can never buy the same
+seat, and ticket prices come from the server. Changes from other people arrive live (Realtime).
+
+**Accounts and the owner's approval.** There's no email sender yet, so Supabase can't prove who owns
+an address. A new email becomes a renter right away, but an account whose email matches someone the
+theatre already has (cast, staff, an owner) waits until the owner confirms it under **People &
+access → Accounts to confirm**; otherwise anyone could claim the owner's record by typing the owner's
+email. Anyone can delete their account in **Settings → Delete my account** (an App Store requirement).
+Forgotten passwords are reset by the owner in the Supabase dashboard (Authentication → Users).
 
 Card payments are still **simulated** (demo card numbers above) until Stripe is connected. See
 `docs/BACKEND.md` for that and push notifications.
 
-> **Website sign-in limitation:** Neon keeps the sign-in session in a cookie from `neon.tech`. The
-> iOS and Android apps handle it fine, but on the website it's a third-party cookie, so sign-in fails
-> in Safari and in browsers that block third-party cookies (the sign-in screen says so). Details and
-> the fix options are in `docs/BACKEND.md`.
-
-**Setting up a Neon project** (one time; this repo's project is already set up):
-1. `npm i -g neon`, `neon login`, then `neon init` in this folder to create or link a project. It
-   writes `.env.local` and `.neon` (both git-ignored).
-2. `neon deploy` turns on Neon Auth and the Data API as declared in `neon.ts`.
-3. Turn off password sign-in so accounts only come from emailed codes:
-   `neon neon-auth config email-password update --enabled false`.
-4. `npm run db:migrate` creates the tables, rules and functions in `db/migrations`.
-5. Optional demo data: `npm run db:seed -- --owner you@example.com` (empty database only). That
-   email becomes the theatre owner; without the seed, add yourself to `people` with role `owner`.
-6. For the published website, trust its address: `neon neon-auth domain add https://<owner>.github.io`.
-7. For the APK and website builds, add GitHub repository variables (**Settings → Secrets and
-   variables → Actions → Variables**) `NEON_AUTH_BASE_URL` and `NEON_DATA_API_URL` with the values
-   from `.env.local`. They are public endpoints, not secrets. Never add `DATABASE_URL` there.
-8. Before inviting real renters and cast, connect your own email provider in Neon Auth. Neon's
-   shared sender is meant for development.
+**Setting up a Supabase project** (one time; this repo's project is already set up):
+1. `brew install supabase/tap/supabase`, `supabase login`, then `supabase link --project-ref <ref>`.
+2. `npm run db:migrate` (`supabase db push --remote`) creates the tables, rules, functions and
+   Realtime publication in `supabase/migrations`.
+3. `supabase config push` applies the auth settings in `supabase/config.toml`: email + password on,
+   **Confirm email** off (there's no email sender yet) and an 8-character minimum password.
+4. Optional demo data: `npm run db:seed -- --owner you@example.com` (empty database only; needs
+   `SUPABASE_DB_URL` in `.env.local`). The first owner is linked by hand once: create an account in
+   the app with that email, then set `people.auth_user_id` for the owner row in the SQL editor.
+5. For the APK and website builds, add GitHub repository variables (**Settings → Secrets and
+   variables → Actions → Variables**) and Expo `production` environment variables
+   `SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY`. Both are public by design. Never put the
+   database password or a secret / service-role key there.
+6. Before inviting real renters and cast, connect an email provider (Authentication → SMTP) so
+   accounts can be verified and passwords reset by email.

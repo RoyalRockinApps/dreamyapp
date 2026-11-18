@@ -27,8 +27,9 @@ import type {
   Channel,
   ConceptWorkspace,
   FeasibilityCheck,
-  Membership,
+  LinkRequest,
   MemberConflict,
+  Membership,
   Message,
   OpenAudition,
   Order,
@@ -80,6 +81,12 @@ export interface AppState {
   /** per-person home screen layout (missing = role default) */
   homeLayouts: Record<string, HomeLayout>;
   setHomeLayout(userId: string, layout: HomeLayout | null): void;
+  /** live mode, owner only: sign-ins waiting to be confirmed as an existing person */
+  linkRequests: LinkRequest[];
+  approveLink(authUserId: string): Promise<void>;
+  declineLink(authUserId: string): Promise<void>;
+  /** live mode: delete the signed-in person's account (App Store requirement) */
+  deleteMyAccount(): Promise<void>;
 
   switchUser(id: string): void;
   updateHouse(h: HouseConfig): void; // throws if sold/blocked seats would vanish
@@ -171,6 +178,7 @@ function fresh(): Data {
     performerProfiles: {},
     productionAuditions: {},
     auditionEntries: [],
+    linkRequests: [],
     ...seed,
   };
 }
@@ -190,6 +198,7 @@ export function emptyState(): Data {
     performerProfiles: {},
     productionAuditions: {},
     auditionEntries: [],
+    linkRequests: [],
     users: [],
     bookings: [],
     productions: [],
@@ -286,6 +295,20 @@ export const useStore = create<AppState>()(
         ...(LIVE ? emptyState() : fresh()),
 
         switchUser: (id) => set({ currentUserId: id }),
+        approveLink: async (authUserId) => {
+          if (!LIVE) return;
+          await api.approveLinkRequest(authUserId);
+          await refresh(['links', 'people']);
+        },
+        declineLink: async (authUserId) => {
+          if (!LIVE) return;
+          await api.declineLinkRequest(authUserId);
+          await refresh(['links']);
+        },
+        deleteMyAccount: async () => {
+          if (!LIVE) throw new Error('There’s no account to delete in the demo.');
+          await api.deleteMyAccount();
+        },
         resetDemo: () => {
           if (LIVE) return;
           const f = fresh();
@@ -853,7 +876,7 @@ export const useStore = create<AppState>()(
 const DATA_KEYS = [
   'currentUserId', 'venue', 'settings', 'users', 'bookings', 'productions', 'schedule', 'conflicts',
   'channels', 'messages', 'lastRead', 'performances', 'orders', 'tickets', 'house', 'adminPin', 'setup', 'homeLayouts',
-  'productionConcepts', 'performerProfiles', 'productionAuditions', 'auditionEntries',
+  'productionConcepts', 'performerProfiles', 'productionAuditions', 'auditionEntries', 'linkRequests',
 ] as const;
 
 function pickData(s: AppState): Data {

@@ -40,7 +40,7 @@ begin
 end $$;
 create trigger initialize_production_plan after insert on public.productions
   for each row execute function private.initialize_production_plan();
-revoke execute on function private.initialize_production_plan() from public, anonymous, authenticated;
+revoke execute on function private.initialize_production_plan() from public, anon, authenticated;
 
 alter table public.production_plans enable row level security;
 alter table public.production_milestones enable row level security;
@@ -76,7 +76,7 @@ begin
 end $$;
 create trigger guard_director_assignment before insert or update of is_director on public.memberships
   for each row execute function private.guard_director_assignment();
-revoke execute on function private.guard_director_assignment() from public, anonymous, authenticated;
+revoke execute on function private.guard_director_assignment() from public, anon, authenticated;
 
 -- A pitch, director membership and all company channels become visible together.
 create function public.create_production(p_production jsonb, p_channels jsonb, p_pitch text)
@@ -94,7 +94,7 @@ begin
     from pg_catalog.jsonb_populate_recordset(null::public.channels, p_channels) c;
   update public.production_plans set stage = 'concept', pitch = p_pitch where production_id = p.id;
 end $$;
-revoke execute on function public.create_production(jsonb, jsonb, text) from public, anonymous;
+revoke execute on function public.create_production(jsonb, jsonb, text) from public, anon;
 grant execute on function public.create_production(jsonb, jsonb, text) to authenticated;
 
 create function public.create_production_group(p_production text, p_group jsonb, p_channel text)
@@ -106,5 +106,5 @@ begin
   insert into public.channels (id, production_id, name, kind, group_id)
     values (p_channel, p_production, p_group ->> 'name', 'group', p_group ->> 'id');
 end $$;
-revoke execute on function public.create_production_group(text, jsonb, text) from public, anonymous;
+revoke execute on function public.create_production_group(text, jsonb, text) from public, anon;
 grant execute on function public.create_production_group(text, jsonb, text) to authenticated;

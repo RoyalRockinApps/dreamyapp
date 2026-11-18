@@ -1,14 +1,14 @@
 import Constants from 'expo-constants';
 
-const extra = (Constants.expoConfig?.extra ?? {}) as { neonAuthUrl?: string; neonDataApiUrl?: string; demo?: boolean };
+const extra = (Constants.expoConfig?.extra ?? {}) as { supabaseUrl?: string; supabaseKey?: string; demo?: boolean };
 
-/** Neon Auth (Managed Better Auth) base URL, e.g. https://ep-….neonauth…/neondb/auth */
-export const AUTH_URL = (extra.neonAuthUrl ?? '').replace(/\/$/, '');
-/** Neon Data API (PostgREST) base URL, e.g. https://ep-….apirest…/neondb/rest/v1 */
-export const DATA_API_URL = (extra.neonDataApiUrl ?? '').replace(/\/$/, '');
+/** Supabase project URL, e.g. https://abcd1234.supabase.co */
+export const SUPABASE_URL = (extra.supabaseUrl ?? '').replace(/\/$/, '');
+/** Supabase publishable (anon) key. Designed to be public; row-level security protects the data. */
+export const SUPABASE_KEY = extra.supabaseKey ?? '';
 
 /**
- * Live mode: everyone signs in and shares one database (Neon). Without the Neon settings
+ * Live mode: everyone signs in and shares one database (Supabase). Without the Supabase settings
  * (see app.config.js), or with EXPO_PUBLIC_DEMO=1, the app runs the on-device demo.
  */
-export const LIVE = !!AUTH_URL && !!DATA_API_URL && !extra.demo;
+export const LIVE = !!SUPABASE_URL && !!SUPABASE_KEY && !extra.demo;

@@ -63,5 +63,5 @@ begin
       format('Production stage changed from %s to %s.', initcap(v_previous), initcap(p_stage)),
       clock_timestamp(), p_stage);
 end $$;
-revoke execute on function public.change_production_stage(text, text, text) from public, anonymous;
+revoke execute on function public.change_production_stage(text, text, text) from public, anon;
 grant execute on function public.change_production_stage(text, text, text) to authenticated;

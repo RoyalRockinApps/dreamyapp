@@ -7,7 +7,7 @@ language sql stable security definer set search_path = '' as $$
     where production_id = p_production and person_id = private.me() and can_review_auditions
   )
 $$;
-revoke execute on function private.can_review_audition(text) from public, anonymous;
+revoke execute on function private.can_review_audition(text) from public, anon;
 grant execute on function private.can_review_audition(text) to authenticated;
 
 create or replace function private.can_read_performer_profile(p_person text) returns boolean
@@ -80,6 +80,6 @@ end
 $$;
 
 revoke execute on function public.list_audition_review_cards(text, text, integer),
-  public.save_audition_review(text, text, text, text) from public, anonymous;
+  public.save_audition_review(text, text, text, text) from public, anon;
 grant execute on function public.list_audition_review_cards(text, text, integer),
   public.save_audition_review(text, text, text, text) to authenticated;
