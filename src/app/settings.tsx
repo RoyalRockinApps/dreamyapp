@@ -38,6 +38,8 @@ export default function Settings() {
         </Row>
       </Card>
 
+      <Button variant="secondary" icon="person-outline" title="My performer profile" onPress={() => router.push('/performer-profile')} />
+
       {LIVE && (
         <Button
           variant="secondary"

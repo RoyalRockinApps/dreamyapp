@@ -29,9 +29,24 @@ ships to **iOS, Android** and the web.
   send a payment request through the share sheet, mark events complete, refund security deposits,
   and see confirmed and pending revenue.
 
-### 2. The owner's show place: productions, company, schedule and chat
-- **Productions** with groups (Leads, Ensemble, Dance Corps, Kids Chorus, Tech Crew, Pit Band…).
-- **Rehearsal scheduler.** Set the call type, space, which groups are called, and weekly repeats.
+### 2. Production planning for directors, staff and cast
+- **Timeline.** Start with a pitch and optional run dates. Move the show through Stage 0 Concept,
+  Stage 1 Casting, Stage 2 Preparation, and Stage 3 Production. Mark it Completed after the run.
+  Directors can set dated milestones and mark them done. Each stage change updates the timeline
+  and posts an unread company announcement that appears on Home.
+- **Concept workspace.** Directors and staff with Concept planning access can write a private
+  production brief, assign feasibility checks with deadlines, and draft audition details. The
+  stage confirmation shows open checks and the draft. Directors can then edit and publish it
+  from Company when they open audition registration.
+- **Company.** The venue owner can designate directors. Directors can add cast and staff, assign
+  roles and groups, and schedule calls. Added members sign in with the email used on the roster.
+- **Auditions.** Directors open registration and grant staff review access from the Company tab.
+  In Audition Review, tap a card to see the full profile, swipe right for Callback, or swipe left
+  for Not a fit. The review team shares decisions, audition notes, and suggested roles.
+  Performers apply from
+  Home using one reusable profile with a headshot, optional skills, and any past roles.
+- **Scheduler.** Plan auditions, rehearsals, tech, performances, and strike. Set the space, groups
+  called, and weekly repeats.
   It **refuses to double-book the Main Stage** and warns about cast/crew who have submitted
   conflicts for that date.
 - **RSVPs.** Each member answers Going / Maybe / Can't. Directors see the counts and who hasn't replied.
@@ -117,13 +132,40 @@ Then re-run the workflow (Actions → *Build app & website* → *Run workflow*).
 
 Installing the APK: open the link on an Android phone and allow "install unknown apps" for the browser
 when prompted. The demo APK is signed with a debug key, which is fine for sideloading. For the Play Store,
-use `npx eas-cli@latest build -p android --profile production` with your own upload key. iOS installs
-go through TestFlight: `npx eas-cli@latest build -p ios` plus an Apple Developer account.
+use `npx eas-cli@latest build -p android --profile production` with your own upload key.
 `eas.json` also has a `preview` profile that builds an APK on Expo's servers.
 
 > **The app and the website run the same code and share the same data** once the build has the
 > Neon settings (see *Live backend* below). A build without them runs the on-device demo, where
 > each phone and browser keeps its own copy.
+
+## Run and distribute on iOS
+
+To open the demo on a Mac with an iOS Simulator and Expo Go for SDK 58:
+
+```bash
+EXPO_PUBLIC_DEMO=1 npm run ios -- --go
+```
+
+For a standalone simulator build, sign in to Expo (`npx eas-cli@latest login`), then run:
+
+```bash
+npx eas-cli@latest build --platform ios --profile ios-simulator
+```
+
+Accept the CLI's install prompt when the build finishes. The simulator profile runs in demo mode
+and requires no Apple signing credentials. Use a physical iPhone to test camera-based ticket scanning.
+
+To install on an iPhone through TestFlight, use the `production` build profile. This requires
+an Apple Developer Program team and App Store Connect access. For live data, set
+`NEON_AUTH_BASE_URL` and `NEON_DATA_API_URL` in the Expo project's `production` environment.
+
+```bash
+npx eas-cli@latest build --platform ios --profile production
+npx eas-cli@latest submit --platform ios --profile production
+```
+
+Once App Store Connect finishes processing the build, add it to a TestFlight tester group.
 
 ## Run it
 

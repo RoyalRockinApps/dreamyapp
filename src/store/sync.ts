@@ -55,8 +55,18 @@ const loaders: Record<BaseSlice, () => Promise<Patch>> = {
     return { bookings: [...b.map((r) => R.toBooking(r, p)), ...x.filter((k) => k.kind === 'booking').map(R.busyToBooking)] };
   },
   productions: async () => {
-    const [p, m] = await Promise.all([rows<R.ProductionRow>('productions', ['created_at', 'id']), rows<R.MembershipRow>('memberships', ['created_at', 'person_id'])]);
-    return { productions: p.map((r) => R.toProduction(r, m)) };
+    const [productions, members, plans, milestones] = await Promise.all([
+      rows<R.ProductionRow>('productions', ['created_at', 'id']),
+      rows<R.MembershipRow>('memberships', ['created_at', 'person_id']),
+      rows<R.ProductionPlanRow>('production_plans', ['production_id']),
+      rows<R.ProductionMilestoneRow>('production_milestones', ['id']),
+    ]);
+    const planByProduction = new Map(plans.map((p) => [p.production_id, p]));
+    return {
+      productions: productions.map((p) => R.toProduction(
+        p, members, planByProduction.get(p.id), milestones.filter((m) => m.production_id === p.id).map(R.toMilestone),
+      )),
+    };
   },
   schedule: async () => {
     const [s, r, x] = await Promise.all([rows<R.ScheduleRow>('schedule_items', ['starts_at', 'id']), rows<R.RsvpRow>('rsvps', ['item_id', 'person_id']), busy()]);

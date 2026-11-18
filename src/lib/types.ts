@@ -154,6 +154,8 @@ export interface Membership {
   groupIds: string[];
   part?: string; // character / crew position
   isDirector?: boolean;
+  canReviewAuditions?: boolean;
+  canPlanConcept?: boolean;
 }
 
 export interface Production {
@@ -161,10 +163,111 @@ export interface Production {
   title: string;
   tagline?: string;
   color: string;
-  openingDate: string;
-  closingDate: string;
+  openingDate?: string;
+  closingDate?: string;
   groups: Group[];
   members: Membership[];
+  stage?: ProductionStage;
+  pitch?: string;
+  milestones?: ProductionMilestone[];
+}
+
+export const PRODUCTION_STAGES = ['concept', 'casting', 'preparation', 'production'] as const;
+export type MilestoneStage = (typeof PRODUCTION_STAGES)[number];
+export type ProductionStage = MilestoneStage | 'completed';
+
+export interface ProductionMilestone {
+  id: string;
+  stage: MilestoneStage;
+  title: string;
+  dueDate?: string; // local calendar date, YYYY-MM-DD
+  completed: boolean;
+}
+
+export interface PerformerCredit {
+  production: string;
+  role: string;
+  year?: string;
+}
+
+export interface PerformerProfile {
+  headshot: string;
+  skills: string[];
+  credits: PerformerCredit[];
+}
+
+export interface ProductionAudition {
+  isOpen: boolean;
+  details: string;
+}
+
+export interface ProductionBrief {
+  premise: string;
+  audience: string;
+  performanceWindow: string;
+  castSize: string;
+  roughBudget: string;
+}
+
+export interface AuditionDraft {
+  roles: string;
+  timing: string;
+  preparation: string;
+}
+
+export const FEASIBILITY_ITEMS = ['rights', 'venue', 'budget', 'staffing', 'technical'] as const;
+export type FeasibilityItem = (typeof FEASIBILITY_ITEMS)[number];
+export type FeasibilityStatus = 'open' | 'working' | 'blocked' | 'ready';
+
+export interface FeasibilityCheck {
+  item: FeasibilityItem;
+  status: FeasibilityStatus;
+  assigneeId?: string;
+  dueDate?: string;
+  notes: string;
+}
+
+export interface ConceptWorkspace {
+  brief: ProductionBrief;
+  auditionDraft: AuditionDraft;
+  checks: FeasibilityCheck[];
+}
+
+export interface OpenAudition {
+  productionId: string;
+  title: string;
+  details: string;
+}
+
+export interface AuditionApplication {
+  productionId: string;
+  title: string;
+  submittedAt: string;
+}
+
+export interface AuditionApplicant {
+  personId: string;
+  name: string;
+  submittedAt: string;
+}
+
+export type AuditionDecision = 'pending' | 'callback' | 'pass';
+export type AuditionReviewFilter = AuditionDecision | 'all';
+
+export interface AuditionReviewCard extends AuditionApplicant {
+  headshot: string;
+  summary: string;
+  decision: AuditionDecision;
+}
+
+export type AuditionFeedbackKind = 'note' | 'role';
+
+export interface AuditionFeedback {
+  id: string;
+  authorName: string;
+  kind: AuditionFeedbackKind;
+  body: string;
+  createdAt: string;
 }
 
 export type ScheduleKind =
@@ -176,7 +279,9 @@ export type ScheduleKind =
   | 'Dress'
   | 'Call Time'
   | 'Meeting'
-  | 'Audition';
+  | 'Audition'
+  | 'Performance'
+  | 'Strike';
 
 export const SCHEDULE_KINDS: ScheduleKind[] = [
   'Rehearsal',
@@ -188,6 +293,8 @@ export const SCHEDULE_KINDS: ScheduleKind[] = [
   'Call Time',
   'Meeting',
   'Audition',
+  'Performance',
+  'Strike',
 ];
 
 export type Space = 'Main Stage' | 'Rehearsal Room' | 'Lobby' | 'Dressing Rooms' | 'Off-site';
@@ -233,6 +340,7 @@ export interface Message {
   userId: string;
   text: string;
   at: string;
+  productionStage?: ProductionStage;
 }
 
 // ---------- Ticketing ----------

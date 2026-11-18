@@ -206,8 +206,216 @@ test('company: chat, DMs, RSVPs, schedule and casting follow the director rules'
   assert.ok((await conflict('c_t2', 'u_caleb')).error, 'not for someone else');
 });
 
+test('production pitches, stages and milestones follow company and director access', async () => {
+  const create = (id: string, channelId: string) => `select create_production(
+    '{"id":"${id}","title":"A New Show","color":"#9B8DE3","groups":[]}',
+    '[{"id":"${channelId}","kind":"announcements","name":"Announcements"}]',
+    'Pitch the show before booking dates')`;
+  assert.ok((await as('maya', create('p_cast_draft', 'ch_cast_draft'))).error);
+  assert.equal((await as('owner', create('p_draft', 'ch_draft'))).error, undefined);
+  assert.ok((await as('owner', create('p_failed', 'ch_draft'))).error, 'a duplicate channel aborts production creation');
+  assert.equal(await count('owner', "select count(*) from productions where id = 'p_failed'"), 0);
+  assert.equal((await as('owner', "select stage from production_plans where production_id = 'p_draft'"))[0].stage, 'concept');
+  assert.equal((await as('owner', "select opening_date from productions where id = 'p_draft'"))[0].opening_date, null);
+  assert.equal(await count('stranger', "select count(*) from productions where id = 'p_draft'"), 0);
+  assert.equal(await count('owner', "select count(*) from memberships where production_id = 'p_draft' and person_id = 'u_owner' and is_director"), 1);
+
+  assert.equal((await as('owner', "insert into memberships (production_id, person_id, is_director) values ('p_draft', 'u_ben', true), ('p_draft', 'u_maya', false)")).error, undefined);
+  const stage = (from: string, to: string) => `select change_production_stage('p_draft', '${from}', '${to}')`;
+  assert.ok((await as('maya', stage('concept', 'casting'))).error, 'cast cannot change the production stage');
+  assert.equal((await as('ben', stage('concept', 'casting'))).error, undefined);
+  assert.equal((await as('ben', stage('concept', 'casting'))).error, undefined, 'retrying the same transition does not post twice');
+  assert.match((await as('owner', stage('concept', 'preparation'))).error ?? '', /stage changed/, 'stale edits cannot move the production');
+  assert.equal((await as('maya', "select stage from production_plans where production_id = 'p_draft'"))[0].stage, 'casting');
+  assert.deepEqual(await as('maya', "select production_stage, body from messages where channel_id = 'ch_draft'"), [
+    { production_stage: 'casting', body: 'Production stage changed from Concept to Casting.' },
+  ]);
+  assert.equal(await count('stranger', "select count(*) from messages where channel_id = 'ch_draft'"), 0);
+  assert.ok((await as('ben', "insert into messages (id, channel_id, person_id, body, production_stage) values ('m_fake', 'ch_draft', 'u_ben', 'Fake completed stage', 'completed')")).error, 'manual messages cannot impersonate stage updates');
+  assert.match((await as('ben', "update memberships set is_director = true where production_id = 'p_draft' and person_id = 'u_maya'")).error ?? '', /Only the venue owner/);
+  assert.equal((await as('maya', "select pitch from production_plans where production_id = 'p_draft'"))[0].pitch, 'Pitch the show before booking dates');
+  assert.ok((await as('ben', "update production_plans set stage = 'completed' where production_id = 'p_draft'")).error, 'stage changes go through the announcement transaction');
+  const add = (id: string) => `insert into production_milestones (id, production_id, stage, title, due_date)
+    values ('${id}', 'p_draft', 'casting', 'Post the cast list', '2027-01-20')`;
+  assert.equal((await as('ben', add('ms_cast'))).error, undefined);
+  assert.ok((await as('maya', add('ms_denied'))).error);
+  assert.equal((await as('maya', "update production_milestones set completed = true where id = 'ms_cast' returning id")).length, 0);
+  assert.equal((await as('ben', "update production_milestones set completed = true where id = 'ms_cast' returning id")).length, 1);
+  assert.equal((await as('maya', "select completed from production_milestones where id = 'ms_cast'"))[0].completed, true);
+  assert.equal((await as('ben', "update productions set opening_date = '2027-05-02', closing_date = '2027-05-04' where id = 'p_draft' returning id")).length, 1);
+  assert.equal(await count('stranger', "select count(*) from production_plans where production_id = 'p_draft'"), 0);
+  assert.equal(await count('stranger', "select count(*) from production_milestones where id = 'ms_cast'"), 0);
+
+  const addStaff = (channelId: string) => `select create_production_group(
+    'p_draft', '{"id":"g_draft_staff","name":"Staff","color":"#9B8DE3"}', '${channelId}')`;
+  assert.ok((await as('ben', addStaff('ch_draft'))).error, 'a duplicate channel aborts group creation');
+  assert.equal((await as('ben', "select groups from productions where id = 'p_draft'"))[0].groups.length, 0);
+  assert.equal((await as('ben', addStaff('ch_draft_staff'))).error, undefined);
+  assert.equal(await count('ben', "select count(*) from channels where id = 'ch_draft_staff'"), 1);
+  assert.equal(await count('maya', "select count(*) from channels where id = 'ch_draft_staff'"), 0);
+});
+
+test('performers must save a profile and only share it by applying', async () => {
+  const project = 'p_audition';
+  const open = `insert into production_auditions (production_id, is_open, details)
+    values ('${project}', true, 'Prepare a one-minute monologue.')
+    on conflict (production_id) do update set is_open = excluded.is_open, details = excluded.details`;
+  const apply = `select apply_for_audition('${project}')`;
+  const photo = 'data:image/jpeg;base64,/9j/2Q==';
+
+  assert.equal((await as('owner', `select create_production(
+    '{"id":"${project}","title":"Summer Comedy","color":"#9B8DE3","groups":[]}',
+    '[]', 'Private pitch')`)).error, undefined);
+  assert.ok((await as('maya', open)).error, 'performers cannot advertise someone else’s show');
+  assert.equal((await as('owner', open)).error, undefined);
+  assert.equal(await count('jordan', `select count(*) from productions where id = '${project}'`), 0);
+  const listings = await as('jordan', 'select * from list_open_auditions()');
+  assert.deepEqual(listings, [{ production_id: project, title: 'Summer Comedy', details: 'Prepare a one-minute monologue.' }]);
+  assert.match((await as('jordan', apply)).error ?? '', /Save a performer profile/);
+  assert.ok((await as('jordan', `insert into audition_applications (production_id, person_id)
+    values ('${project}', 'u_renter')`)).error, 'direct inserts cannot bypass the profile gate');
+  assert.ok((await as('jordan', `insert into performer_profiles (person_id, headshot)
+    values ('u_renter', 'https://example.org/photo.jpg')`)).error, 'external images are rejected');
+  assert.ok((await as('jordan', `insert into performer_profiles (person_id, headshot)
+    values ('u_maya', '${photo}')`)).error, 'the account owns only its profile');
+
+  const profile = (person: string) => `insert into performer_profiles (person_id, headshot, skills, credits)
+    values ('${person}', '${photo}', array['Tap', 'Soprano'],
+      '[{"production":"The Wizard of Oz","role":"Dorothy","year":"2024"}]')
+    on conflict (person_id) do update set headshot = excluded.headshot, skills = excluded.skills, credits = excluded.credits`;
+  assert.equal((await as('jordan', profile('u_renter'))).error, undefined);
+  assert.equal((await as('jordan', profile('u_renter'))).error, undefined, 'an applicant can update their own profile');
+  assert.ok((await as('jordan', `update performer_profiles set credits = '[{"production":"Show","role":2}]'
+    where person_id = 'u_renter'`)).error, 'past roles have a consistent format');
+  assert.equal((await as('maya', `insert into performer_profiles (person_id, headshot) values ('u_maya', '${photo}')`)).error, undefined,
+    'first-time performers can save a profile without skills or credits');
+  assert.equal(await count('owner', 'select count(*) from performer_profiles'), 0, 'private until the performer applies');
+
+  assert.equal((await as('jordan', apply)).error, undefined);
+  assert.equal((await as('jordan', apply)).error, undefined);
+  assert.equal(await count('owner', 'select count(*) from audition_applications'), 1, 'retry does not duplicate an application');
+  assert.equal((await as('owner', `select person_id from list_audition_applicants('${project}')`))[0].person_id, 'u_renter');
+  assert.equal(await count('owner', 'select count(*) from performer_profiles'), 1, 'only the applicant’s profile is shared');
+  assert.equal(await count('ben', 'select count(*) from performer_profiles'), 0, 'a director on a different production cannot read it');
+  assert.ok((await as('ben', `select * from list_audition_applicants('${project}')`)).error);
+  assert.equal(await count('maya', 'select count(*) from audition_applications'), 0, 'cast cannot browse other applicants');
+  assert.equal((await as('owner', `insert into memberships (production_id, person_id, is_director)
+    values ('${project}', 'u_ben', true)`)).error, undefined);
+  assert.deepEqual((await as('ben', "select skills from performer_profiles where person_id = 'u_renter'"))[0].skills, ['Tap', 'Soprano']);
+  assert.equal((await as('ben', "update performer_profiles set skills = '{}' where person_id = 'u_renter' returning person_id")).length, 0);
+  assert.equal((await as('ben', "delete from audition_applications where person_id = 'u_renter' returning person_id")).length, 0);
+
+  const cards = (filter: string) => `select * from list_audition_review_cards('${project}', '${filter}', 0)`;
+  const decide = (expected: string, decision: string) =>
+    `select save_audition_review('${project}', 'u_renter', '${expected}', '${decision}')`;
+  assert.equal((await as('ben', cards('pending')))[0].headshot, photo);
+  assert.ok((await as('jordan', cards('all'))).error, 'applicants cannot browse review cards');
+  assert.ok((await as('maya', decide('pending', 'callback'))).error);
+  assert.equal((await as('owner', `insert into memberships (production_id, person_id, can_review_auditions)
+    values ('${project}', 'u_maya', true)`)).error, undefined);
+  assert.equal((await as('maya', cards('pending')))[0].credit.role, 'Dorothy');
+  assert.equal(await count('maya', "select count(*) from performer_profiles where person_id = 'u_renter'"), 1);
+  assert.equal((await as('maya', decide('pending', 'callback'))).error, undefined);
+  assert.equal((await as('ben', cards('callback')))[0].decision, 'callback');
+  assert.match((await as('ben', decide('pending', 'pass'))).error ?? '', /decision changed/);
+  assert.equal((await as('ben', decide('callback', 'pass'))).error, undefined);
+  assert.equal((await as('maya', cards('pass')))[0].decision, 'pass');
+  const feedback = `select kind, body, author_name from list_audition_feedback('${project}', 'u_renter')`;
+  const note = `select id from add_audition_feedback('${project}', 'u_renter', 'af_test_note', 'note', 'Strong projection.')`;
+  assert.equal((await as('maya', note))[0].id, 'af_test_note');
+  assert.equal((await as('maya', note))[0].id, 'af_test_note', 'a retried save returns the original entry');
+  assert.equal((await as('ben', `select id from add_audition_feedback('${project}', 'u_renter', 'af_test_role', 'role', 'Ensemble')`))[0].id, 'af_test_role');
+  assert.deepEqual(await as('owner', feedback), [
+    { author_name: 'Ben Okafor', kind: 'role', body: 'Ensemble' },
+    { author_name: 'Maya Brooks', kind: 'note', body: 'Strong projection.' },
+  ]);
+  assert.ok((await as('jordan', feedback)).error, 'applicants cannot read feedback');
+  assert.ok((await as('jordan', note)).error, 'applicants cannot add feedback');
+  assert.ok((await as('ben', `select id from add_audition_feedback('${project}', 'u_renter', 'af_test_empty', 'role', '   ')`)).error);
+  assert.equal((await as('maya', "select * from audition_reviews")).length, 0, 'decision table stays private');
+  assert.equal((await as('owner', `update memberships set can_review_auditions = false
+    where production_id = '${project}' and person_id = 'u_maya'`)).error, undefined);
+  assert.ok((await as('maya', cards('all'))).error);
+  assert.ok((await as('maya', feedback)).error, 'removing staff access also removes feedback access');
+  assert.equal(await count('maya', "select count(*) from performer_profiles where person_id = 'u_renter'"), 0);
+
+  assert.equal((await as('ben', `update production_auditions set is_open = false where production_id = '${project}'`)).error, undefined);
+  assert.equal(await count('jordan', 'select count(*) from list_open_auditions()'), 0);
+  assert.match((await as('maya', apply)).error ?? '', /audition is closed/);
+  assert.equal((await as('jordan', apply)).error, undefined, 'an accepted retry remains safe after closing');
+  assert.equal((await as('jordan', 'select title from list_my_audition_applications()'))[0].title, 'Summer Comedy');
+  assert.equal(await count('maya', 'select count(*) from list_my_audition_applications()'), 0);
+
+  const withdrew = await as('jordan', `delete from audition_applications where production_id = '${project}'
+    and person_id = 'u_renter' returning person_id`);
+  assert.equal(withdrew.length, 1);
+  assert.equal((await sys('select * from audition_reviews')).length, 0);
+  assert.equal((await sys('select * from audition_feedback')).length, 0);
+  assert.equal(await count('ben', 'select count(*) from performer_profiles'), 0, 'withdrawal revokes the director’s access');
+  assert.equal(await count('jordan', 'select count(*) from performer_profiles'), 1, 'profile remains reusable');
+});
+
+test('Concept planning is private and the audition draft needs a separate publish action', async () => {
+  const project = 'p_concept_test';
+  const where = `where production_id = '${project}'`;
+  const create = `select create_production(
+    '{"id":"${project}","title":"Concept Test","color":"#9B8DE3","groups":[]}',
+    '[{"id":"ch_concept_test","kind":"announcements","name":"Announcements"}]', null)`;
+  assert.equal((await as('owner', create)).error, undefined);
+  assert.equal((await as('owner', `insert into memberships (production_id, person_id, is_director)
+    values ('${project}', 'u_ben', true), ('${project}', 'u_maya', false)`)).error, undefined);
+
+  const saveBrief = `insert into production_concepts (production_id, premise, audience)
+    values ('${project}', 'A town loses its library', 'Families')
+    on conflict (production_id) do update set premise = excluded.premise, audience = excluded.audience`;
+  assert.equal((await as('ben', saveBrief)).error, undefined);
+  assert.ok((await as('maya', saveBrief)).error, 'cast cannot write the concept');
+  assert.equal(await count('maya', `select count(*) from production_concepts ${where}`), 0);
+  const toggle = (enabled: boolean) => `update memberships set can_plan_concept = ${enabled} ${where} and person_id = 'u_maya' returning person_id`;
+  assert.equal((await as('maya', toggle(true))).length, 0, 'cast cannot grant themselves planning access');
+  assert.equal((await as('ben', toggle(true)))[0].person_id, 'u_maya');
+
+  const saveDraft = `insert into production_concepts (production_id, audition_roles, audition_timing, audition_preparation)
+    values ('${project}', 'Librarian', 'December 4', 'A short monologue')
+    on conflict (production_id) do update set audition_roles = excluded.audition_roles,
+    audition_timing = excluded.audition_timing, audition_preparation = excluded.audition_preparation`;
+  assert.equal((await as('maya', saveDraft)).error, undefined);
+  assert.equal((await as('ben', saveBrief)).error, undefined);
+  assert.deepEqual(await as('ben', `select premise, audience, audition_roles from production_concepts ${where}`), [
+    { premise: 'A town loses its library', audience: 'Families', audition_roles: 'Librarian' },
+  ]);
+  const assign = (person: string) => `insert into production_feasibility (production_id, item, status, assignee_id, due_date, notes)
+    values ('${project}', 'rights', 'blocked', '${person}', '2026-12-01', 'Awaiting approval')
+    on conflict (production_id, item) do update set assignee_id = excluded.assignee_id`;
+  assert.equal((await as('maya', assign('u_ben'))).error, undefined);
+  assert.ok((await as('maya', assign('u_renter'))).error, 'assignments stay within the company');
+  assert.deepEqual(await as('ben', `select status, assignee_id, due_date::text, notes from production_feasibility ${where}`), [
+    { status: 'blocked', assignee_id: 'u_ben', due_date: '2026-12-01', notes: 'Awaiting approval' },
+  ]);
+  assert.equal(await count('stranger', `select count(*) from production_concepts ${where}`), 0);
+  assert.equal(await count('stranger', `select count(*) from production_feasibility ${where}`), 0);
+  assert.ok((await as('maya', `select change_production_stage('${project}', 'concept', 'casting')`)).error);
+  assert.equal((await as('ben', `select change_production_stage('${project}', 'concept', 'casting')`)).error, undefined);
+  assert.equal(await count('stranger', 'select count(*) from list_open_auditions()'), 0);
+  assert.equal((await as('ben', `insert into production_auditions (production_id, is_open, details)
+    select production_id, true, audition_roles from production_concepts ${where}`)).error, undefined);
+  assert.equal((await as('stranger', 'select details from list_open_auditions()'))[0].details, 'Librarian');
+  assert.equal((await as('ben', `update production_auditions set is_open = false ${where}`)).error, undefined);
+
+  assert.equal((await as('ben', toggle(false)))[0].person_id, 'u_maya');
+  assert.equal(await count('maya', `select count(*) from production_concepts ${where}`), 0);
+  assert.equal(await count('maya', `select count(*) from production_feasibility ${where}`), 0);
+  assert.ok((await as('maya', assign('u_ben'))).error);
+});
+
 test('signed-out visitors cannot call the app’s functions', async () => {
   await db.exec(`begin; set local role anonymous;`);
   await assert.rejects(db.query(`select hold_seats('perf_elf_1', array['A-C1'])`));
+  await db.exec('rollback;');
+  await db.exec(`begin; set local role anonymous;`);
+  await assert.rejects(db.query('select * from list_open_auditions()'));
+  await db.exec('rollback;');
+  await db.exec(`begin; set local role anonymous;`);
+  await assert.rejects(db.query('select * from production_concepts'));
   await db.exec('rollback;');
 });

@@ -4,7 +4,7 @@ import { Tabs } from 'expo-router/tabs';
 import type { ColorValue } from 'react-native';
 
 import { IconButton, type IconName } from '@/components/ui';
-import { useCurrentUser } from '@/store/useStore';
+import { useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
 function icon(name: IconName) {
@@ -17,11 +17,12 @@ function icon(name: IconName) {
 export default function TabsLayout() {
   const user = useCurrentUser();
   const role = user.role;
+  const inCompany = useStore((s) => s.productions.some((p) => p.members.some((m) => m.userId === user.id)));
   // Each role sees the parts of the app that matter to them.
   const show = {
     calendar: role !== 'member',
     rentals: role !== 'member',
-    shows: role !== 'renter',
+    shows: role !== 'renter' || inCompany,
   };
 
   return (
