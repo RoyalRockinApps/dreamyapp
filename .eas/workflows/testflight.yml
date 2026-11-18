@@ -1,0 +1,33 @@
+# Builds the iOS app and sends it to the TestFlight external group "DT External Testing".
+# Every TestFlight release goes to that group. Run it from an up-to-date main:
+#
+#   npx eas-cli@latest workflow:run .eas/workflows/testflight.yml
+#
+# The run uploads this folder as it is, so start from a clean checkout of main.
+# Apple runs Beta App Review on the first build of each app version, which needs the App Review
+# sign-in filled in under App Store Connect → TestFlight → Test Information (see README).
+name: TestFlight (DT External Testing)
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build_ios:
+    name: Build iOS
+    type: build
+    params:
+      platform: ios
+      profile: production
+
+  testflight:
+    name: Send to DT External Testing
+    type: testflight
+    needs: [build_ios]
+    params:
+      build_id: ${{ needs.build_ios.outputs.build_id }}
+      profile: production
+      external_groups: ['DT External Testing']
+      changelog: |
+        Sign in with your email and password, or create an account if you're new.
+        Try the parts you use: shows and tickets, rentals, rehearsals and the calendar, and chat.
+        To report a problem, take a screenshot and send it with TestFlight's feedback.

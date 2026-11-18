@@ -164,12 +164,16 @@ an Apple Developer Program team and App Store Connect access. For live data, set
 TestFlight → Test Information → Beta App Review Information, tick **Sign-in required** and enter the
 review account's email and password (an owner account that shows every feature; see *Live backend*).
 
+Every TestFlight release goes to the external group **DT External Testing**. From a clean,
+up-to-date checkout of `main`, run:
+
 ```bash
-npx eas-cli@latest build --platform ios --profile production
-npx eas-cli@latest submit --platform ios --profile production
+npx eas-cli@latest workflow:run .eas/workflows/testflight.yml
 ```
 
-Once App Store Connect finishes processing the build, add it to a TestFlight tester group.
+The workflow builds the `production` profile, uploads it to App Store Connect and adds it to DT
+External Testing. Apple runs Beta App Review on the first build of each version.
+(`eas submit --groups` only reaches internal groups, which is why this uses a workflow.)
 
 ## Run it
 
