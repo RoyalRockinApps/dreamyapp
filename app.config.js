@@ -10,6 +10,12 @@ module.exports = ({ config }) => ({
     ...config.experiments,
     ...(process.env.EXPO_BASE_URL ? { baseUrl: process.env.EXPO_BASE_URL } : {}),
   },
+  // scripts/testflight.sh names the Apple team and numbers each iPhone build it uploads (date and time).
+  ios: {
+    ...config.ios,
+    ...(process.env.APPLE_TEAM_ID ? { appleTeamId: process.env.APPLE_TEAM_ID } : {}),
+    ...(process.env.IOS_BUILD_NUMBER ? { buildNumber: process.env.IOS_BUILD_NUMBER } : {}),
+  },
   extra: {
     ...config.extra,
     supabaseUrl: process.env.SUPABASE_URL || undefined,
