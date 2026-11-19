@@ -9,7 +9,7 @@ import { LIVE } from '@/lib/backend';
 import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
-const ROLE_LABEL: Record<Role, string> = { owner: 'Owner / staff', renter: 'Renter', member: 'Cast & crew' };
+const ROLE_LABEL: Record<Role, string> = { owner: 'Owner / staff', renter: 'Renter / visitor', member: 'Cast & crew' };
 const ROLE_HELP: Record<Role, string> = {
   owner: 'Full access, including this admin portal.',
   renter: 'Can request dates, pay deposits and see their own bookings.',

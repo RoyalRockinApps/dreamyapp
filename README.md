@@ -5,6 +5,14 @@ An all-in-one app for the owner of **[The Dream Theatre](https://thedreamtheatre
 Today the theatre takes bookings by email and phone ("Book Your Event Now" → `mailto:`).
 This app moves that, along with the owner's own productions and ticket sales, onto phones.
 
+**The app is for people affiliated with the theatre:** owners and staff, cast and crew, and anyone in a
+production's company. Renters and ticket buyers outside the theatre use
+[thedreamtheatre.com](https://thedreamtheatre.com/). They can still create an account in the app, but
+only to save a performer profile and apply for auditions; Home points them to the website, the
+rental and ticket screens are closed to them, and the database refuses their rental requests,
+payments and ticket orders (`supabase/migrations/20261118000009_company_only_app.sql`). Joining a
+company opens the rest of the app. The owner still records bookings and box-office sales for anyone.
+
 Built with **Expo SDK 58 / React Native 0.88 / Expo Router**. One TypeScript codebase
 ships to **iOS, Android** and the web.
 
@@ -94,7 +102,7 @@ their own sensible default. **Reset to default** restores it.
 | Role | Sections available |
 |---|---|
 | Owner | Shortcuts, Needs you, Coming up, Next show, This month (money), Messages, Setup progress |
-| Renter | Book the theatre, Your bookings, On stage soon, Contact |
+| Renter (in a company) | Book the theatre, Your bookings, On stage soon, Contact |
 | Cast & crew | Next call, Production hub, After that, Announcements, My tickets |
 
 ### Three roles, one app
@@ -104,7 +112,7 @@ profile icon (top right) → **Preview the app as…** to switch personas:
 | Persona | Sees |
 |---|---|
 | **Theatre owner** | Dashboard, calendar, rentals pipeline, productions, box office, check-in, rates & policy settings |
-| **Renter** (Jordan Ellis) | Open dates, booking wizard, their bookings and deposits, tickets |
+| **Visitor** (Jordan Ellis, a renter in no company) | Auditions, their performer profile, contact, and a link to thedreamtheatre.com for renting and tickets |
 | **Cast member** (Maya Brooks, _Jovie_ in Elf) | Their calls with RSVP, conflicts, company chat, their tickets |
 
 Demo data is seeded from the theatre's real public calendar (UAH Wind Ensemble, The Unknown Tour,
@@ -257,7 +265,7 @@ holds, ticket sales and check-in run as database functions, so two people can ne
 seat, and ticket prices come from the server. Changes from other people arrive live (Realtime).
 
 **Accounts and the owner's approval.** There's no email sender yet, so Supabase can't prove who owns
-an address. A new email becomes a renter right away, but an account whose email matches someone the
+an address. A new email right away becomes a visitor (role renter, in no company: auditions only), but an account whose email matches someone the
 theatre already has (cast, staff, an owner) waits until the owner confirms it under **People &
 access → Accounts to confirm**; otherwise anyone could claim the owner's record by typing the owner's
 email. Anyone can delete their account in **Settings → Delete my account** (an App Store requirement).
