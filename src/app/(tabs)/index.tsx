@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import { Fragment } from 'react';
-import { Linking, Platform, View } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { HomeWidget } from '@/components/HomeWidgets';
 import { ProductionUpdates } from '@/components/ProductionUpdates';
-import { Button, Card, Empty, Screen, Txt } from '@/components/ui';
+import { Button, Card, Empty, Screen, ScreenWall, Txt } from '@/components/ui';
 import { MONTHS, WEEKDAYS } from '@/lib/dates';
 import { APK_URL, SITE_NAME, SITE_URL } from '@/lib/links';
 import { useCurrentUser, useHomeLayout, useIsAffiliated, useStore } from '@/store/useStore';
@@ -22,11 +22,11 @@ export default function Home() {
 
   return (
     <Screen>
-      <View style={{ gap: 4, paddingTop: 4 }}>
-        <Txt v="label" color={C.gold}>{`${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`}</Txt>
+      <ScreenWall>
+        <Txt v="label" color={C.accent}>{`${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`}</Txt>
         <Txt v="h1">{first ? `${hello}, ${first}` : hello}</Txt>
-        {user.role === 'renter' ? <Txt v="muted" style={{ fontStyle: 'italic' }}>{venue.tagline}</Txt> : null}
-      </View>
+        <Txt v="muted" style={{ fontStyle: 'italic' }}>{venue.tagline}</Txt>
+      </ScreenWall>
 
       {affiliated ? <ProductionUpdates /> : <OutsideTheTheatre />}
       <Button variant="secondary" icon="mic-outline" title="Find auditions" onPress={() => router.push('/auditions')} />
@@ -53,7 +53,7 @@ export default function Home() {
 /** For someone outside the theatre: the app is only for auditions; renting and tickets are on the website. */
 function OutsideTheTheatre() {
   return (
-    <Card accent={C.gold} style={{ gap: 10 }}>
+    <Card accent={C.accent} style={{ gap: 10 }}>
       <Txt v="h3">Renting the theatre or buying tickets?</Txt>
       <Txt v="small">{`Book your event and get show tickets at ${SITE_NAME}. This app is for the theatre’s staff, cast and crew, and for performers applying to audition.`}</Txt>
       <Button icon="globe-outline" title={`Open ${SITE_NAME}`} onPress={() => Linking.openURL(SITE_URL)} />

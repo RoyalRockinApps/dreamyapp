@@ -37,7 +37,7 @@ export default function AdminOverview() {
       <Card>
         <Row>
           <Txt v="h2" style={{ flex: 1 }}>Setup checklist</Txt>
-          <Pill label={`${done} of ${checklist.length}`} color={C.gold} bg={C.goldSoft} />
+          <Pill label={`${done} of ${checklist.length}`} color={C.accent} bg={C.accentSoft} />
         </Row>
         <ProgressBar value={done / checklist.length} />
         {checklist.map((c) => (

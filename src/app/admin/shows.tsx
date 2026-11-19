@@ -57,7 +57,7 @@ function PerformanceEditor({ p }: { p: Performance }) {
           <Txt v="small">{`${fmtDate(p.start, { weekday: true, year: true })} · ${fmtTime(p.start)}`}</Txt>
         </View>
         <Pill label={p.onSale ? 'On sale' : 'Off sale'} color={p.onSale ? C.green : C.warn} bg={p.onSale ? C.greenSoft : C.warnSoft} />
-        <Switch value={p.onSale} onValueChange={(v) => updatePerformance(p.id, { onSale: v })} trackColor={{ true: C.gold, false: C.surface2 }} />
+        <Switch value={p.onSale} onValueChange={(v) => updatePerformance(p.id, { onSale: v })} trackColor={{ true: C.accent, false: C.surface2 }} />
       </Row>
       <ProgressBar value={(s.sold + s.comp) / s.sellable} color={C.curtain} />
       <Txt v="small">{`${s.sold} sold · ${s.comp} comp · ${s.blocked} held back · ${s.available} available · ${money(gross)} gross`}</Txt>

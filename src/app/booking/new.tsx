@@ -11,7 +11,7 @@ import { busyDays, findConflicts, stageBusy } from '@/lib/scheduling';
 import { EVENT_TYPES, type EventType } from '@/lib/types';
 import { useNow } from '@/hooks/useAgenda';
 import { useCurrentUser, useStore } from '@/store/useStore';
-import { C, R } from '@/theme';
+import { C, F, R } from '@/theme';
 import { alert } from '@/components/alert';
 
 const STEPS = ['Date & time', 'Event', 'Contact', 'Review'];
@@ -166,10 +166,10 @@ export default function NewBooking() {
                       paddingVertical: 10,
                       borderRadius: R.md,
                       borderWidth: 1,
-                      borderColor: on ? C.gold : C.border,
-                      backgroundColor: on ? C.goldSoft : clash ? '#140F24' : C.surface,
+                      borderColor: on ? C.accent : C.border,
+                      backgroundColor: on ? C.accentSoft : clash ? C.bg : C.surface,
                     }}>
-                    <Text style={{ color: clash ? C.faint : on ? C.gold : C.text, fontWeight: '700', textDecorationLine: clash ? 'line-through' : 'none' }}>{fmtMinutes(m)}</Text>
+                    <Text style={{ color: clash ? C.faint : on ? C.accent : C.text, fontFamily: F.bold, textDecorationLine: clash ? 'line-through' : 'none' }}>{fmtMinutes(m)}</Text>
                   </Pressable>
                 );
               })}
@@ -201,11 +201,11 @@ export default function NewBooking() {
             {settings.addOns.map((a) => {
               const on = addOns.includes(a.id);
               return (
-                <Card key={a.id} onPress={() => toggleAddOn(a.id)} style={on ? { borderColor: C.gold } : undefined}>
+                <Card key={a.id} onPress={() => toggleAddOn(a.id)} style={on ? { borderColor: C.accent } : undefined}>
                   <Row>
-                    <Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? C.gold : C.faint} />
+                    <Ionicons name={on ? 'checkbox' : 'square-outline'} size={22} color={on ? C.accent : C.faint} />
                     <Txt v="h3" style={{ flex: 1 }}>{a.name}</Txt>
-                    <Txt v="h3" color={C.gold}>{`${money(a.price)}${a.per === 'hour' ? '/hr' : ''}`}</Txt>
+                    <Txt v="h3" color={C.accent}>{`${money(a.price)}${a.per === 'hour' ? '/hr' : ''}`}</Txt>
                   </Row>
                   <Txt v="small">{a.description}</Txt>
                 </Card>
@@ -217,7 +217,7 @@ export default function NewBooking() {
                   <Txt v="h3">List on the public calendar</Txt>
                   <Txt v="small">Show the event name to other visitors of the app.</Txt>
                 </View>
-                <Switch value={isPublic} onValueChange={setIsPublic} trackColor={{ true: C.gold, false: C.surface2 }} />
+                <Switch value={isPublic} onValueChange={setIsPublic} trackColor={{ true: C.accent, false: C.surface2 }} />
               </Row>
             </Card>
             <Field label="Notes for the theatre" value={notes} onChangeText={setNotes} multiline placeholder="Stage needs, rehearsal time, special requests…" />
@@ -252,13 +252,13 @@ export default function NewBooking() {
               <KeyValue k="Rental total" v={money(quote.rentalTotal, true)} strong />
               <KeyValue k="Refundable security deposit" v={money(quote.securityDeposit, true)} />
               <Divider />
-              <KeyValue k="Due to reserve" v={money(quote.depositDue, true)} strong color={C.gold} />
+              <KeyValue k="Due to reserve" v={money(quote.depositDue, true)} strong color={C.accent} />
               <KeyValue k={`Balance due by ${fmtDate(quote.balanceDueDate, { year: true })}`} v={money(quote.balanceDue, true)} />
             </Card>
             {!isOwner && (
               <Card onPress={() => setAgree(!agree)} style={errors.agree ? { borderColor: C.danger } : undefined}>
                 <Row style={{ alignItems: 'flex-start' }}>
-                  <Ionicons name={agree ? 'checkbox' : 'square-outline'} size={22} color={agree ? C.gold : C.faint} />
+                  <Ionicons name={agree ? 'checkbox' : 'square-outline'} size={22} color={agree ? C.accent : C.faint} />
                   <View style={{ flex: 1, gap: 6 }}>
                     <Txt v="h3">I agree to the rental terms</Txt>
                     <Txt v="small">{settings.cancellationPolicy}</Txt>
@@ -294,8 +294,8 @@ function Stepper({ step, onJump }: { step: number; onJump: (i: number) => void }
     <View style={{ flexDirection: 'row', paddingHorizontal: 16, paddingTop: 12, gap: 6 }}>
       {STEPS.map((s, i) => (
         <Pressable key={s} onPress={() => onJump(i)} style={{ flex: 1, gap: 6 }}>
-          <View style={{ height: 4, borderRadius: 2, backgroundColor: i <= step ? C.gold : C.surface2 }} />
-          <Text style={{ color: i === step ? C.gold : C.faint, fontSize: 11, fontWeight: '700' }}>{s}</Text>
+          <View style={{ height: 4, borderRadius: 2, backgroundColor: i <= step ? C.accent : C.surface2 }} />
+          <Text style={{ color: i === step ? C.accent : C.faint, fontSize: 11, fontFamily: F.bold, letterSpacing: 0.6 }}>{s}</Text>
         </Pressable>
       ))}
     </View>
@@ -307,11 +307,11 @@ function Stepper2({ label, value, min, onChange }: { label: string; value: numbe
     <Row style={{ backgroundColor: C.surface, borderRadius: R.md, padding: 10, borderWidth: 1, borderColor: C.border }}>
       <Txt v="h3" style={{ flex: 1 }}>{label}</Txt>
       <Pressable hitSlop={8} onPress={() => value > min && onChange(value - 1)}>
-        <Ionicons name="remove-circle" size={30} color={value > min ? C.gold : C.faint} />
+        <Ionicons name="remove-circle" size={30} color={value > min ? C.accent : C.faint} />
       </Pressable>
       <Txt v="h2" style={{ minWidth: 36, textAlign: 'center' }}>{String(value)}</Txt>
       <Pressable hitSlop={8} onPress={() => value < 72 && onChange(value + 1)}>
-        <Ionicons name="add-circle" size={30} color={C.gold} />
+        <Ionicons name="add-circle" size={30} color={C.accent} />
       </Pressable>
     </Row>
   );

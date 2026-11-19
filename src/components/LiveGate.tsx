@@ -2,7 +2,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, ScrollView, View } from 'react-native';
 
-import { Button, Card, Field, Txt } from '@/components/ui';
+import { Button, Card, Field, QuiltBackground, ScreenWall, Txt } from '@/components/ui';
+import { Wordmark } from '@/components/Wordmark';
 import { SITE_NAME, SITE_URL } from '@/lib/links';
 import { signIn, signUp } from '@/lib/remote/auth';
 import { VENUE } from '@/lib/seed';
@@ -36,7 +37,7 @@ export function LiveGate() {
         </Card>
       ) : status === 'pending' ? (
         <Card style={{ gap: 12 }}>
-          <Ionicons name="hourglass-outline" size={30} color={C.gold} />
+          <Ionicons name="hourglass-outline" size={30} color={C.accent} />
           <Txt v="h2">Almost there</Txt>
           <Txt v="muted">{message ?? 'The theatre needs to confirm this account.'}</Txt>
           {email ? <Txt v="small">{`Signed in as ${email}`}</Txt> : null}
@@ -45,7 +46,7 @@ export function LiveGate() {
         </Card>
       ) : (
         <View style={{ alignItems: 'center', gap: 12 }}>
-          <ActivityIndicator color={C.gold} size="large" />
+          <ActivityIndicator color={C.accent} size="large" />
           <Txt v="muted">{status === 'loading' ? 'Raising the curtain…' : 'Opening the theatre…'}</Txt>
         </View>
       )}
@@ -82,11 +83,12 @@ function SignIn() {
 
   return (
     <Shell>
-      <View style={{ alignItems: 'center', gap: 6, marginBottom: 8 }}>
-        <Ionicons name="sparkles" size={30} color={C.gold} />
-        <Txt v="display" style={{ textAlign: 'center' }}>{VENUE.name}</Txt>
-        <Txt v="muted" style={{ textAlign: 'center' }}>{VENUE.tagline}</Txt>
-      </View>
+      <ScreenWall style={{ marginBottom: 8 }}>
+        <View style={{ alignItems: 'center', gap: 12, paddingVertical: 8 }}>
+          <Wordmark width={250} />
+          <Txt v="muted" style={{ textAlign: 'center', letterSpacing: 0.5, fontStyle: 'italic' }}>{VENUE.tagline}</Txt>
+        </View>
+      </ScreenWall>
       <Card style={{ gap: 14 }}>
         <Txt v="h2">{creating ? 'Create your account' : 'Sign in'}</Txt>
         <Txt v="muted">
@@ -134,6 +136,7 @@ function SignIn() {
 function Shell({ children }: { children: ReactNode }) {
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <QuiltBackground />
       <ScrollView contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', padding: 24, gap: 16, width: '100%', maxWidth: 440, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         {children}
       </ScrollView>

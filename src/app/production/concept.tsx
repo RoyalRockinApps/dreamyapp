@@ -77,7 +77,7 @@ function ConceptWorkspace({ production, user }: { production: Production; user: 
             <Txt color={C.danger}>{loadError}</Txt>
             <Button variant="secondary" title="Try again" onPress={() => void refresh()} />
           </>
-        ) : <ActivityIndicator color={C.gold} accessibilityLabel="Loading Concept workspace" />}
+        ) : <ActivityIndicator color={C.accent} accessibilityLabel="Loading Concept workspace" />}
       </Screen>
     );
   }
@@ -91,11 +91,11 @@ function ConceptWorkspace({ production, user }: { production: Production; user: 
 
   return (
     <Screen>
-      <Card accent={blocked.length ? C.danger : C.gold}>
-        <Txt v="label" color={C.gold}>Private planning workspace</Txt>
+      <Card accent={blocked.length ? C.danger : C.accent}>
+        <Txt v="label" color={C.accent}>Private planning workspace</Txt>
         <Txt v="h2">{production.title}</Txt>
         <Txt v="small">{`${ready} of ${FEASIBILITY_ITEMS.length} feasibility checks ready`}</Txt>
-        <ProgressBar value={ready / FEASIBILITY_ITEMS.length} color={C.gold} />
+        <ProgressBar value={ready / FEASIBILITY_ITEMS.length} color={C.accent} />
         {blocked.length > 0 && <Txt color={C.danger}>{`Blocked · ${blocked.map(({ item }) => FEASIBILITY_LABELS[item]).join(', ')}`}</Txt>}
       </Card>
 

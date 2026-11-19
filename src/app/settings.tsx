@@ -36,7 +36,7 @@ export default function Settings() {
             <Txt v="h3">{user.name}</Txt>
             <Txt v="small">{user.email}</Txt>
           </View>
-          <Pill label={affiliated ? user.role : 'visitor'} color={C.gold} bg={C.goldSoft} />
+          <Pill label={affiliated ? user.role : 'visitor'} color={C.accent} bg={C.accentSoft} />
         </Row>
       </Card>
 
@@ -93,10 +93,10 @@ export default function Settings() {
               router.dismissAll();
               router.replace('/');
             }}
-            style={on ? { borderColor: C.gold } : undefined}>
+            style={on ? { borderColor: C.accent } : undefined}>
             <Row>
               <Txt v="h3" style={{ flex: 1 }}>{`${p.label}${u ? ` · ${u.name}` : ''}`}</Txt>
-              {on && <Pill label="Current" color={C.gold} bg={C.goldSoft} />}
+              {on && <Pill label="Current" color={C.accent} bg={C.accentSoft} />}
             </Row>
             <Txt v="small">{p.desc}</Txt>
           </Card>
@@ -104,7 +104,7 @@ export default function Settings() {
       })}
 
       {affiliated && <SectionHeader title="Admin portal" />}
-      {affiliated && <Card accent={C.gold}>
+      {affiliated && <Card accent={C.accent}>
         <Txt v="h3">Set everything up</Txt>
         <Txt v="small">Venue profile, rental rates & deposits, packages, seating chart, ticket prices, people and backups — on your phone or at the website.</Txt>
         <Button icon="settings" title={isOwner ? 'Open admin portal' : 'Owner sign-in'} onPress={() => router.push('/admin')} />

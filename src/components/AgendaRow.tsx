@@ -26,7 +26,7 @@ export function AgendaRow({ item, showDate = true }: { item: AgendaItem; showDat
       })}>
       <View style={{ width: 4, borderRadius: 2, backgroundColor: color }} />
       <View style={{ width: 64 }}>
-        {showDate && <Txt v="small" color={C.gold}>{relativeDay(item.start)}</Txt>}
+        {showDate && <Txt v="small" color={C.accent}>{relativeDay(item.start)}</Txt>}
         <Txt v="h3">{fmtTime(item.start)}</Txt>
         <Txt v="small">{multi ? `→ ${fmtDate(item.end)}` : `to ${fmtTime(item.end)}`}</Txt>
       </View>

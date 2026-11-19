@@ -76,7 +76,7 @@ function Registration({ productionId, includeConceptDraft }: { productionId: str
       </>
     );
   }
-  if (data === undefined) return <ActivityIndicator accessibilityLabel="Loading audition registration" color={C.gold} />;
+  if (data === undefined) return <ActivityIndicator accessibilityLabel="Loading audition registration" color={C.accent} />;
 
   return (
     <>
