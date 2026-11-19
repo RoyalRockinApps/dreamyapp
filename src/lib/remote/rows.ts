@@ -19,6 +19,8 @@ import type {
   Rsvp,
   ScheduleItem,
   SeatClaim,
+  Task,
+  TaskUpdate,
   Ticket,
   User,
   VenueInfo,
@@ -42,6 +44,7 @@ export interface PersonRow {
   phone: Nullable<string>;
   role: User['role'];
   color: string;
+  team_lead?: boolean;
 }
 
 export interface BookingRow {
@@ -124,6 +127,7 @@ export interface MembershipRow {
   is_director: boolean;
   can_review_auditions?: boolean;
   can_plan_concept?: boolean;
+  lead_group_ids?: Nullable<string[]>;
 }
 
 export interface ScheduleRow {
@@ -240,7 +244,7 @@ const num = (v: number | string) => Number(v);
 // ---------- people ----------
 
 export function toUser(r: PersonRow): User {
-  return { id: r.id, name: r.name, email: r.email, phone: opt(r.phone), role: r.role, color: r.color };
+  return { id: r.id, name: r.name, email: r.email, phone: opt(r.phone), role: r.role, color: r.color, ...(r.team_lead ? { teamLead: true } : {}) };
 }
 
 export function fromUser(u: Partial<User> & { id: string }): Partial<PersonRow> {
@@ -250,6 +254,7 @@ export function fromUser(u: Partial<User> & { id: string }): Partial<PersonRow> 
   if ('phone' in u) row.phone = u.phone ?? null;
   if (u.role !== undefined) row.role = u.role;
   if (u.color !== undefined) row.color = u.color;
+  if (u.teamLead !== undefined) row.team_lead = u.teamLead;
   return row;
 }
 
@@ -387,6 +392,7 @@ export function toProduction(r: ProductionRow, members: MembershipRow[] = [], pl
         ...(m.is_director ? { isDirector: true } : {}),
         ...(m.can_review_auditions ? { canReviewAuditions: true } : {}),
         ...(m.can_plan_concept ? { canPlanConcept: true } : {}),
+        ...(m.lead_group_ids?.length ? { leadGroupIds: m.lead_group_ids } : {}),
       })),
   };
 }
@@ -415,6 +421,7 @@ export function fromMembership(productionId: string, m: Production['members'][nu
   return {
     production_id: productionId, person_id: m.userId, group_ids: m.groupIds, part: m.part ?? null,
     is_director: !!m.isDirector, can_review_auditions: !!m.canReviewAuditions, can_plan_concept: !!m.canPlanConcept,
+    lead_group_ids: m.leadGroupIds ?? [],
   };
 }
 
@@ -580,3 +587,60 @@ export interface LinkRequestRow {
 export function toLinkRequest(r: LinkRequestRow): LinkRequest {
   return { authUserId: r.auth_user_id, personId: r.person_id, email: r.email, name: opt(r.name), declined: r.declined, requestedAt: iso(r.requested_at) };
 }
+
+// ---------- task boards ----------
+
+export interface TaskRow {
+  id: string;
+  production_id: Nullable<string>;
+  group_id: Nullable<string>;
+  title: string;
+  notes: string;
+  status: Task['status'];
+  assignee_id: Nullable<string>;
+  due_date: Nullable<string>;
+  created_by: Nullable<string>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskUpdateRow {
+  id: string;
+  task_id: string;
+  person_id: Nullable<string>;
+  author_name: string;
+  body: string;
+  at: string;
+}
+
+export const toTask = (r: TaskRow): Task => ({
+  id: r.id,
+  ...(r.production_id ? { productionId: r.production_id } : {}),
+  ...(r.group_id ? { groupId: r.group_id } : {}),
+  title: r.title,
+  notes: r.notes ?? '',
+  status: r.status,
+  ...(r.assignee_id ? { assigneeId: r.assignee_id } : {}),
+  ...(r.due_date ? { dueDate: r.due_date } : {}),
+  ...(r.created_by ? { createdBy: r.created_by } : {}),
+  createdAt: iso(r.created_at),
+  updatedAt: iso(r.updated_at),
+});
+
+/** The columns a client may write; the server sets who made it and when. */
+export function fromTask(t: Partial<Task>): Partial<TaskRow> {
+  const row: Partial<TaskRow> = {};
+  if (t.id !== undefined) row.id = t.id;
+  if ('productionId' in t) row.production_id = t.productionId ?? null;
+  if ('groupId' in t) row.group_id = t.groupId ?? null;
+  if (t.title !== undefined) row.title = t.title;
+  if (t.notes !== undefined) row.notes = t.notes;
+  if (t.status !== undefined) row.status = t.status;
+  if ('assigneeId' in t) row.assignee_id = t.assigneeId ?? null;
+  if ('dueDate' in t) row.due_date = t.dueDate ?? null;
+  return row;
+}
+
+export const toTaskUpdate = (r: TaskUpdateRow): TaskUpdate => ({
+  id: r.id, taskId: r.task_id, ...(r.person_id ? { personId: r.person_id } : {}), authorName: r.author_name, body: r.body, at: iso(r.at),
+});

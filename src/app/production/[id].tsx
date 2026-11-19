@@ -1,12 +1,13 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Pressable, ScrollView, View } from 'react-native';
 
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { ProductionAuditions } from '@/components/ProductionAuditions';
 import { ProductionStageBadge } from '@/components/ProductionStage';
 import { ProductionTimeline } from '@/components/ProductionTimeline';
+import { TaskBoard } from '@/components/TaskBoard';
 import { Avatar, Button, Card, Chips, Collapsible, Empty, Field, ListItem, Pill, ProgressBar, Row, Screen, Segmented, Txt } from '@/components/ui';
 import { useNow } from '@/hooks/useAgenda';
 import { useChannels } from '@/hooks/useChannels';
@@ -19,7 +20,7 @@ import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
 import { C, F } from '@/theme';
 import { alert } from '@/components/alert';
 
-type Tab = 'timeline' | 'schedule' | 'company' | 'chat' | 'tickets';
+type Tab = 'timeline' | 'schedule' | 'tasks' | 'company' | 'chat' | 'tickets';
 
 export default function ProductionHub() {
   const params = useLocalSearchParams<{ id: string; tab?: Tab; item?: string }>();
@@ -39,17 +40,23 @@ export default function ProductionHub() {
       <Txt v="small">{production.openingDate && production.closingDate
         ? `Runs ${fmtDate(production.openingDate, { weekday: true })} – ${fmtDate(production.closingDate, { weekday: true })}`
         : 'Run dates to be announced'}</Txt>
-      <Segmented
-        options={['timeline', 'schedule', 'company', 'chat', 'tickets'] as const}
-        value={tab}
-        onChange={setTab}
-        labels={{ timeline: 'Timeline', schedule: 'Schedule', company: 'Company', chat: unread ? `Chat (${unread > 9 ? '9+' : unread})` : 'Chat', tickets: 'Tickets' }}
-      />
+      {/* six tabs don't fit a phone's width: the strip scrolls sideways there */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, minWidth: 560 }}>
+        <View style={{ flex: 1 }}>
+          <Segmented
+            options={['timeline', 'schedule', 'tasks', 'company', 'chat', 'tickets'] as const}
+            value={tab}
+            onChange={setTab}
+            labels={{ timeline: 'Timeline', schedule: 'Schedule', tasks: 'Tasks', company: 'Company', chat: unread ? `Chat (${unread > 9 ? '9+' : unread})` : 'Chat', tickets: 'Tickets' }}
+          />
+        </View>
+      </ScrollView>
       {tab === 'timeline' && <ProductionTimeline production={production} onSchedule={(id) => {
         setHighlight(id);
         setTab('schedule');
       }} />}
       {tab === 'schedule' && <ScheduleTab p={production} highlight={highlight} />}
+      {tab === 'tasks' && <TaskBoard productionId={production.id} />}
       {tab === 'company' && <CompanyTab p={production} />}
       {tab === 'chat' && <ChatTab p={production} />}
       {tab === 'tickets' && <TicketsTab p={production} />}
@@ -239,6 +246,7 @@ function CompanyTab({ p }: { p: Production }) {
   const [editing, setEditing] = useState<string | null>(null);
   const [memberPart, setMemberPart] = useState('');
   const [memberGroups, setMemberGroups] = useState<string[]>([]);
+  const [memberLeads, setMemberLeads] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
   const toggle = (list: string[], id: string) => (list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
@@ -321,12 +329,14 @@ function CompanyTab({ p }: { p: Production }) {
                     if (!canManage) return;
                     setMemberPart(m.part ?? '');
                     setMemberGroups(m.groupIds);
+                    setMemberLeads(m.leadGroupIds ?? []);
                     setEditing(editing === `${sec.id}:${u.id}` ? null : `${sec.id}:${u.id}`);
                   }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 8 }}>
                     <Avatar name={u.name} color={u.color} />
                     <View style={{ flex: 1 }}>
                       <Txt v="h3">{u.name + (u.id === user.id ? ' (you)' : '')}</Txt>
                       {m.part ? <Txt v="small">{m.part}</Txt> : null}
+                      {!!m.leadGroupIds?.length && <Txt v="small">{`Team Lead · ${m.leadGroupIds.map((id) => groupLabels[id]).filter(Boolean).join(', ')}`}</Txt>}
                       {m.canReviewAuditions && !m.isDirector && <Txt v="small">Audition reviewer</Txt>}
                       {m.canPlanConcept && !m.isDirector && (canManage || u.id === user.id) && <Txt v="small">Concept planner</Txt>}
                     </View>
@@ -337,7 +347,16 @@ function CompanyTab({ p }: { p: Production }) {
                       <Field label="Role / part" value={memberPart} onChangeText={setMemberPart} editable={!saving} />
                       <Txt v="label">Groups</Txt>
                       <Chips multi options={p.groups.map((g) => g.id)} value={memberGroups} onChange={(id) => setMemberGroups(toggle(memberGroups, id))} labels={groupLabels} colors={groupColors} />
-                      <Button small variant="secondary" title="Save role and groups" loading={saving} onPress={() => void saveMember(() => updateCompanyMember(p.id, u.id, { part: memberPart.trim(), groupIds: memberGroups }))} />
+                      {memberGroups.length > 0 && (
+                        <>
+                          <Txt v="label">Team Lead of</Txt>
+                          <Txt v="small">Team Leads add, move and update their group’s cards on the Tasks board.</Txt>
+                          <Chips multi options={memberGroups} value={memberLeads.filter((id) => memberGroups.includes(id))} onChange={(id) => setMemberLeads(toggle(memberLeads, id))} labels={groupLabels} colors={groupColors} />
+                        </>
+                      )}
+                      <Button small variant="secondary" title="Save role and groups" loading={saving} onPress={() => void saveMember(() => updateCompanyMember(p.id, u.id, {
+                        part: memberPart.trim(), groupIds: memberGroups, leadGroupIds: memberLeads.filter((id) => memberGroups.includes(id)),
+                      }))} />
                       {!m.isDirector && u.role !== 'owner' && (
                         <>
                           <Button small variant="ghost" title={m.canReviewAuditions ? 'Remove audition review access' : 'Give audition review access'} disabled={saving} onPress={() => void saveMember(() => updateCompanyMember(p.id, u.id, { canReviewAuditions: !m.canReviewAuditions }))} />

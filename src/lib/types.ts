@@ -10,6 +10,8 @@ export interface User {
   phone?: string;
   role: Role;
   color: string;
+  /** a theatre Team Lead: sees and manages the theatre task board */
+  teamLead?: boolean;
 }
 
 // ---------- Rentals ----------
@@ -156,6 +158,8 @@ export interface Membership {
   isDirector?: boolean;
   canReviewAuditions?: boolean;
   canPlanConcept?: boolean;
+  /** groups this member leads: they manage those groups' task cards */
+  leadGroupIds?: string[];
 }
 
 export interface Production {
@@ -341,6 +345,35 @@ export interface Message {
   text: string;
   at: string;
   productionStage?: ProductionStage;
+}
+
+// ---------- Task boards ----------
+
+export const TASK_STATUSES = ['not_started', 'in_progress', 'completed'] as const;
+export type TaskStatus = (typeof TASK_STATUSES)[number];
+
+/** A card on a production's task board, or the theatre's when it has no production. */
+export interface Task {
+  id: string;
+  productionId?: string;
+  groupId?: string;
+  title: string;
+  notes: string;
+  status: TaskStatus;
+  assigneeId?: string;
+  dueDate?: string; // local calendar date, YYYY-MM-DD
+  createdBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TaskUpdate {
+  id: string;
+  taskId: string;
+  personId?: string;
+  authorName: string;
+  body: string;
+  at: string;
 }
 
 // ---------- Ticketing ----------

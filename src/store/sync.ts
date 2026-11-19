@@ -92,6 +92,11 @@ const loaders: Record<BaseSlice, () => Promise<Patch>> = {
     for (const r of await rows<R.HomeLayoutRow>('home_layouts', ['person_id'])) out[r.person_id] = r.layout;
     return { homeLayouts: out };
   },
+  // only the boards this person can see (row-level security)
+  tasks: async () => {
+    const [t, u] = await Promise.all([rows<R.TaskRow>('tasks', ['created_at', 'id']), rows<R.TaskUpdateRow>('task_updates', ['at', 'id'])]);
+    return { tasks: t.map(R.toTask), taskUpdates: u.map(R.toTaskUpdate) };
+  },
   // owner only (row-level security returns nothing to anyone else)
   links: async () => ({ linkRequests: (await rows<R.LinkRequestRow>('link_requests', ['requested_at'])).map(R.toLinkRequest) }),
 };
@@ -148,13 +153,13 @@ function scheduleLoad(slices: Slice[]) {
 /** Which parts of the state to reload when a table changes. */
 const TABLE_SLICES: Record<string, Slice[]> = {
   venue_config: ['config'],
-  people: ['people'],
+  people: ['people', 'tasks'],
   bookings: ['bookings'],
   payments: ['bookings'],
   productions: ['productions'],
   production_plans: ['productions'],
   production_milestones: ['productions'],
-  memberships: ['productions', 'people', 'schedule', 'conflicts', 'channels', 'messages'],
+  memberships: ['productions', 'people', 'schedule', 'conflicts', 'channels', 'messages', 'tasks'],
   schedule_items: ['schedule'],
   rsvps: ['schedule'],
   member_conflicts: ['conflicts'],
@@ -164,6 +169,8 @@ const TABLE_SLICES: Record<string, Slice[]> = {
   orders: ['orders'],
   tickets: ['tickets'],
   link_requests: ['links'],
+  tasks: ['tasks'],
+  task_updates: ['tasks'],
 };
 
 let channel: RealtimeChannel | null = null;

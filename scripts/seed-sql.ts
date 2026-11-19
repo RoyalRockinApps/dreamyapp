@@ -26,6 +26,7 @@ export function seedSql(ownerEmail: string, now: Date = new Date()): string {
     ...R.fromUser(u),
     email: u.id === OWNER_ID ? ownerEmail : u.email,
     phone: u.phone ?? null,
+    team_lead: !!u.teamLead,
     auth_user_id: null,
     created_at: stamp(),
   }));

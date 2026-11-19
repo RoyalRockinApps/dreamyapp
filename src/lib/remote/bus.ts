@@ -16,12 +16,13 @@ export type BaseSlice =
   | 'orders'
   | 'tickets'
   | 'layouts'
-  | 'links';
+  | 'links'
+  | 'tasks';
 export type Slice = BaseSlice | `seats:${string}`;
 
 export const ALL_SLICES: BaseSlice[] = [
   'config', 'people', 'bookings', 'productions', 'schedule', 'conflicts', 'channels', 'messages', 'reads',
-  'performances', 'orders', 'tickets', 'layouts', 'links',
+  'performances', 'orders', 'tickets', 'layouts', 'links', 'tasks',
 ];
 
 type Loader = (slices: Slice[]) => Promise<void>;
