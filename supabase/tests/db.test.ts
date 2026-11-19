@@ -132,7 +132,32 @@ test('each person sees only what their role allows', async () => {
   assert.equal(await count('ben', `select count(*) from messages where channel_id = 'ch_dm_maya'`), 0, 'no reading other people’s DMs');
 });
 
-test('rentals: renters request, withdraw and pay; only owners approve', async () => {
+test('outsiders rent and buy tickets at thedreamtheatre.com, not in the app', async () => {
+  const site = /thedreamtheatre\.com/;
+  const [{ s: seat }] = await sys(`select r || '-L' || n as s from unnest(string_to_array('KLM', null)) r, generate_series(1, 7) n
+    where not exists (select 1 from seat_claims c where c.performance_id = 'perf_elf_1' and c.seat_id = r || '-L' || n)
+    order by r, n limit 1`);
+  const request = (id: string) => `insert into bookings (id, renter_id, title, event_type, contact_name, contact_email, contact_phone, starts_at, ends_at, quote, status)
+    values ('${id}', 'u_renter', 'Test', 'Concert', 'J', 'j@example.com', '555', '2027-03-01T18:00Z', '2027-03-01T22:00Z', '{"depositDue":750}', 'inquiry')`;
+  const [{ d }] = await sys(`select (quote->>'depositDue')::numeric d from bookings where id = 'b_gospel'`);
+
+  // Jordan rents and has tickets, but isn't in a company
+  assert.match((await as('jordan', request('b_t0'))).error ?? '', site, 'no rental requests');
+  assert.match((await as('jordan', `select add_payment('b_gospel', ${d}, 'deposit', 'card', 'Visa 4242')`)).error ?? '', site, 'no deposits');
+  assert.match((await as('jordan', `select hold_seats('perf_elf_1', array['${seat}'])`)).error ?? '', site, 'no seat holds');
+  assert.match((await as('jordan', `select purchase_seats('perf_elf_1', array['${seat}'], 'Jordan Ellis', 'jordan.ellis@example.com', 'card')`)).error ?? '', site, 'no tickets');
+  assert.match((await as('stranger', `select hold_seats('perf_elf_1', array['${seat}'])`)).error ?? '', site, 'a new sign-up neither');
+  assert.equal(await count('jordan', `select count(*) from seat_claims where performance_id = 'perf_elf_1' and seat_id = '${seat}'`), 0);
+
+  // the owner still books for them, and joining a company opens the app's rentals and tickets
+  assert.equal((await as('owner', request('b_t0'))).error, undefined, 'the owner books for anyone');
+  assert.equal((await as('owner', `delete from bookings where id = 'b_t0' returning id`)).length, 1);
+  assert.equal((await as('owner', `insert into memberships (production_id, person_id, part) values ('p_elf', 'u_renter', 'Usher')`)).error, undefined);
+  assert.equal((await as('jordan', `select hold_seats('perf_elf_1', array['${seat}'])`)).error, undefined, 'company members can');
+  assert.equal((await as('jordan', `select release_seats('perf_elf_1')`)).error, undefined);
+});
+
+test('rentals: renters in a company request, withdraw and pay; only owners approve', async () => {
   const quote = `'{"lines":[],"rentalTotal":1000,"securityDeposit":250,"depositDue":750,"balanceDue":500,"balanceDueDate":"2027-02-01T00:00:00Z","hours":5}'`;
   const booking = (id: string, status: string, renter = 'u_renter') => `insert into bookings (id, renter_id, title, event_type, contact_name, contact_email, contact_phone, starts_at, ends_at, quote, status)
     values ('${id}', '${renter}', 'Test', 'Concert', 'J', 'j@example.com', '555', '2027-03-01T18:00Z', '2027-03-01T22:00Z', ${quote}, '${status}')`;

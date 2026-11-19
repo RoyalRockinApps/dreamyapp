@@ -7,12 +7,12 @@ import { APK_URL, WEB_URL } from '@/lib/links';
 import { MEMBER_ID, OWNER_ID, RENTER_ID } from '@/lib/seed';
 import { LIVE } from '@/lib/backend';
 import { signOut } from '@/store/sync';
-import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
+import { errorMessage, useCurrentUser, useIsAffiliated, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
 const PERSONAS = [
   { id: OWNER_ID, label: 'Theatre owner', desc: 'Everything: rentals, deposits, productions, box office, check-in.' },
-  { id: RENTER_ID, label: 'Renter', desc: 'Checks dates, requests bookings, pays deposits, buys tickets.' },
+  { id: RENTER_ID, label: 'Visitor', desc: 'Not in a company: applies for auditions here, and rents or buys tickets at thedreamtheatre.com.' },
   { id: MEMBER_ID, label: 'Cast member', desc: 'Sees their calls, RSVPs, submits conflicts and chats with the company.' },
 ];
 
@@ -24,6 +24,7 @@ export default function Settings() {
   const resetDemo = useStore((s) => s.resetDemo);
   const venue = useStore((s) => s.venue);
   const isOwner = user.role === 'owner';
+  const affiliated = useIsAffiliated();
 
   return (
     <Screen>
@@ -35,7 +36,7 @@ export default function Settings() {
             <Txt v="h3">{user.name}</Txt>
             <Txt v="small">{user.email}</Txt>
           </View>
-          <Pill label={user.role} color={C.gold} bg={C.goldSoft} />
+          <Pill label={affiliated ? user.role : 'visitor'} color={C.gold} bg={C.goldSoft} />
         </Row>
       </Card>
 
@@ -102,13 +103,13 @@ export default function Settings() {
         );
       })}
 
-      <SectionHeader title="Admin portal" />
-      <Card accent={C.gold}>
+      {affiliated && <SectionHeader title="Admin portal" />}
+      {affiliated && <Card accent={C.gold}>
         <Txt v="h3">Set everything up</Txt>
         <Txt v="small">Venue profile, rental rates & deposits, packages, seating chart, ticket prices, people and backups — on your phone or at the website.</Txt>
         <Button icon="settings" title={isOwner ? 'Open admin portal' : 'Owner sign-in'} onPress={() => router.push('/admin')} />
-      </Card>
-      {(APK_URL || WEB_URL) && (
+      </Card>}
+      {affiliated && !!(APK_URL || WEB_URL) && (
         <>
           <SectionHeader title="Get the app" />
           <Card>
