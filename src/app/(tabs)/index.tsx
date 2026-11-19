@@ -1,10 +1,10 @@
 import { router } from 'expo-router';
 import { Fragment } from 'react';
-import { Linking, Platform, View } from 'react-native';
+import { Linking, Platform } from 'react-native';
 
 import { HomeWidget } from '@/components/HomeWidgets';
 import { ProductionUpdates } from '@/components/ProductionUpdates';
-import { Button, Card, Empty, Screen, Txt } from '@/components/ui';
+import { Button, Card, Empty, Screen, ScreenWall, Txt } from '@/components/ui';
 import { MONTHS, WEEKDAYS } from '@/lib/dates';
 import { APK_URL, SITE_NAME, SITE_URL } from '@/lib/links';
 import { useCurrentUser, useHomeLayout, useIsAffiliated, useStore } from '@/store/useStore';
@@ -22,11 +22,11 @@ export default function Home() {
 
   return (
     <Screen>
-      <View style={{ gap: 4, paddingTop: 4 }}>
+      <ScreenWall>
         <Txt v="label" color={C.accent}>{`${WEEKDAYS[d.getDay()]}, ${MONTHS[d.getMonth()]} ${d.getDate()}`}</Txt>
         <Txt v="h1">{first ? `${hello}, ${first}` : hello}</Txt>
-        {user.role === 'renter' ? <Txt v="muted" style={{ fontStyle: 'italic' }}>{venue.tagline}</Txt> : null}
-      </View>
+        <Txt v="muted" style={{ fontStyle: 'italic' }}>{venue.tagline}</Txt>
+      </ScreenWall>
 
       {affiliated ? <ProductionUpdates /> : <OutsideTheTheatre />}
       <Button variant="secondary" icon="mic-outline" title="Find auditions" onPress={() => router.push('/auditions')} />

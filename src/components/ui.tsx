@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
-import { Children, useState, type ComponentProps, type ReactNode } from 'react';
+import { Children, useId, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -15,8 +15,9 @@ import {
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
+import Svg, { Defs, LinearGradient, Line as SvgLine, Path, Pattern, RadialGradient, Rect, Stop } from 'react-native-svg';
 
-import { C, F, R, SP } from '@/theme';
+import { C, F, GLOW, R, SP } from '@/theme';
 
 export type IconName = ComponentProps<typeof Ionicons>['name'];
 
@@ -26,13 +27,94 @@ export function tap() {
 
 export function Screen({ children, padded = true, style }: { children: ReactNode; padded?: boolean; style?: StyleProp<ViewStyle> }) {
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: C.bg }}
-      contentContainerStyle={[padded && { padding: SP.lg, gap: SP.lg, paddingBottom: 56, width: '100%', maxWidth: 880, alignSelf: 'center' }, style]}
-      keyboardShouldPersistTaps="handled">
-      {children}
-    </ScrollView>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <QuiltBackground />
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={[padded && { padding: SP.lg, gap: SP.lg, paddingBottom: 56, width: '100%', maxWidth: 880, alignSelf: 'center' }, style]}
+        keyboardShouldPersistTaps="handled">
+        {children}
+      </ScrollView>
+    </View>
   );
+}
+
+/** SVG ids must be unique on the web page, where several screens stay mounted at once. */
+function useSvgId(name: string) {
+  return `${name}${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
+}
+
+/**
+ * The screening room's walls: charcoal quilted in a fine diamond pattern, under one warm spotlight
+ * from above (the website's stage). Fills its parent; draw it first so content sits on top.
+ */
+export function QuiltBackground({ spotlight = true }: { spotlight?: boolean }) {
+  const quilt = useSvgId('quilt');
+  const spot = useSvgId('spot');
+  return (
+    <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+      <Defs>
+        <Pattern id={quilt} width={28} height={40} patternUnits="userSpaceOnUse">
+          <Path d="M0 0 L28 40 M28 0 L0 40" stroke="rgba(255,244,225,0.045)" strokeWidth={1} />
+        </Pattern>
+        <RadialGradient id={spot} cx="50%" cy="0%" rx="75%" ry="55%" fx="50%" fy="0%">
+          <Stop offset="0" stopColor="#FFE3B0" stopOpacity={0.09} />
+          <Stop offset="1" stopColor="#FFE3B0" stopOpacity={0} />
+        </RadialGradient>
+      </Defs>
+      <Rect width="100%" height="100%" fill={`url(#${quilt})`} />
+      {spotlight ? <Rect width="100%" height="100%" fill={`url(#${spot})`} /> : null}
+    </Svg>
+  );
+}
+
+/** A warm LED strip: a hairline that glows when lit, or rests as a faint line when dim. */
+export function LightLine({ dim, vertical, style }: { dim?: boolean; vertical?: boolean; style?: StyleProp<ViewStyle> }) {
+  return (
+    <View
+      style={[
+        vertical ? { width: 1, alignSelf: 'stretch' } : { height: 1, alignSelf: 'stretch' },
+        dim ? { backgroundColor: C.line } : { backgroundColor: C.accent, boxShadow: GLOW },
+        style,
+      ]}
+    />
+  );
+}
+
+/**
+ * The screen wall: walnut panelling with LED inlay lines, framing a dark screen that holds the
+ * content. For a screen's headline: the greeting on Home, the sign-in brand.
+ */
+export function ScreenWall({ children, style }: { children: ReactNode; style?: StyleProp<ViewStyle> }) {
+  const wood = useSvgId('wood');
+  return (
+    <View style={[styles.wall, style]}>
+      <Svg width="100%" height="100%" style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Defs>
+          <LinearGradient id={wood} x1="0" y1="0" x2="1" y2="0.35">
+            <Stop offset="0" stopColor={C.walnut} />
+            <Stop offset="0.35" stopColor={C.walnutLight} />
+            <Stop offset="0.6" stopColor={C.walnut} />
+            <Stop offset="0.85" stopColor={C.walnutLight} />
+            <Stop offset="1" stopColor={C.walnut} />
+          </LinearGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill={`url(#${wood})`} />
+        {[22, 46, 70, 94, 118, 142, 166, 190].map((y) => (
+          <SvgLine key={y} x1="0" x2="100%" y1={y} y2={y} stroke="rgba(0,0,0,0.28)" strokeWidth={1} />
+        ))}
+        {[6, 11, 16].map((x, i) => (
+          <SvgLine key={x} x1={x} x2={x} y1={8 + i * 10} y2="100%" stroke={C.accent} strokeOpacity={0.75 - i * 0.18} strokeWidth={1.2} />
+        ))}
+      </Svg>
+      <View style={styles.screen}>{children}</View>
+    </View>
+  );
+}
+
+/** Header background for every navigator: the room's black with an LED line along its foot. */
+export function HeaderBackdrop() {
+  return <View style={{ flex: 1, backgroundColor: C.bg, borderBottomWidth: 1, borderBottomColor: C.line }} />;
 }
 
 type TxtVariant = 'display' | 'h1' | 'h2' | 'h3' | 'body' | 'muted' | 'small' | 'label' | 'mono';
@@ -83,8 +165,12 @@ export function Card({
   onPress?: () => void;
   accent?: string;
 }) {
+  // an accent is drawn as a lit LED strip down the card's left edge
   const body = (
-    <View style={[styles.card, accent ? { borderLeftWidth: 3, borderLeftColor: accent } : null, style]}>{children}</View>
+    <View style={[styles.card, style]}>
+      {accent ? <View pointerEvents="none" style={[styles.cardStrip, { backgroundColor: accent, boxShadow: `0 0 10px ${accent}` }]} /> : null}
+      {children}
+    </View>
   );
   if (!onPress) return body;
   return (
@@ -123,7 +209,7 @@ export function Button({
 }) {
   const palette = {
     primary: { bg: C.accent, fg: C.onAccent, border: C.accent },
-    secondary: { bg: C.surface2, fg: C.text, border: C.border },
+    secondary: { bg: C.surface2, fg: C.text, border: C.line },
     ghost: { bg: 'transparent', fg: C.accent, border: 'transparent' },
     danger: { bg: C.dangerSoft, fg: C.danger, border: 'transparent' },
     success: { bg: C.green, fg: '#06140C', border: C.green },
@@ -140,6 +226,7 @@ export function Button({
         styles.btn,
         small && { paddingVertical: 8, paddingHorizontal: 12 },
         { backgroundColor: palette.bg, borderColor: palette.border, opacity: disabled ? 0.4 : pressed ? 0.8 : 1 },
+        variant === 'primary' && !disabled ? { boxShadow: `0 0 18px ${C.glow}` } : null,
         style,
       ]}>
       {loading ? (
@@ -147,7 +234,7 @@ export function Button({
       ) : (
         <>
           {icon && <Ionicons name={icon} size={small ? 16 : 18} color={palette.fg} />}
-          <Text style={{ color: palette.fg, fontFamily: F.semibold, letterSpacing: 1, fontSize: small ? 13 : 15 }}>{title}</Text>
+          <Text style={{ color: palette.fg, fontFamily: F.semibold, letterSpacing: 0.8, fontSize: small ? 13 : 15 }}>{title}</Text>
         </>
       )}
     </Pressable>
@@ -164,7 +251,7 @@ export function IconButton({ icon, onPress, color = C.text, size = 22 }: { icon:
 
 export function Pill({ label, color = C.muted, bg, icon }: { label: string; color?: string; bg?: string; icon?: IconName }) {
   return (
-    <View style={[styles.pill, { backgroundColor: bg ?? 'rgba(255,255,255,0.06)' }]}>
+    <View style={[styles.pill, { backgroundColor: bg ?? C.accentSoft }]}>
       {icon && <Ionicons name={icon} size={12} color={color} />}
       <Text style={{ color, fontSize: 12, fontFamily: F.bold, letterSpacing: 0.4 }}>{label}</Text>
     </View>
@@ -178,7 +265,7 @@ export function Stat({ label, value, sub, color = C.text, icon }: { label: strin
         {icon && <Ionicons name={icon} size={14} color={C.muted} />}
         <Txt v="label">{label}</Txt>
       </Row>
-      <Text style={{ color, fontSize: 24, fontFamily: F.display }}>{value}</Text>
+      <Text style={{ color, fontSize: 24, fontFamily: F.display, letterSpacing: 0.5 }}>{value}</Text>
       {sub ? <Txt v="small">{sub}</Txt> : null}
     </View>
   );
@@ -186,9 +273,9 @@ export function Stat({ label, value, sub, color = C.text, icon }: { label: strin
 
 export function SectionHeader({ title, action, onAction }: { title: string; action?: string; onAction?: () => void }) {
   return (
-    <Row style={{ marginTop: SP.sm, marginBottom: -SP.xs }}>
+    <Row gap={SP.md} style={{ marginTop: SP.sm, marginBottom: -SP.xs }}>
       <Txt v="label">{title}</Txt>
-      <Spacer />
+      <LightLine dim style={{ flex: 1, alignSelf: 'center' }} />
       {action && onAction ? (
         <Pressable hitSlop={8} onPress={onAction}>
           <Text style={{ color: C.accent, fontFamily: F.bold, fontSize: 13, letterSpacing: 0.5 }}>{action}</Text>
@@ -268,7 +355,7 @@ export function Segmented<T extends string>({ options, value, onChange, labels }
               tap();
               onChange(o);
             }}
-            style={[styles.segmentItem, on && { backgroundColor: C.accent }]}>
+            style={[styles.segmentItem, on && { backgroundColor: C.accent, boxShadow: `0 0 12px ${C.glow}` }]}>
             <Text style={{ color: on ? C.onAccent : C.muted, fontFamily: F.bold, fontSize: 13, letterSpacing: 0.5 }}>{labels?.[o] ?? o}</Text>
           </Pressable>
         );
@@ -277,7 +364,7 @@ export function Segmented<T extends string>({ options, value, onChange, labels }
   );
 }
 
-export function Avatar({ name, color = C.accent, size = 36 }: { name: string; color?: string; size?: number }) {
+export function Avatar({ name, color = C.leather, size = 36 }: { name: string; color?: string; size?: number }) {
   const initials = name
     .split(/\s+/)
     .filter((w) => /^[A-Za-z]/.test(w))
@@ -351,16 +438,19 @@ export function ListItem({
 export function ProgressBar({ value, color = C.accent }: { value: number; color?: string }) {
   return (
     <View style={{ height: 6, backgroundColor: C.surface2, borderRadius: R.sm, overflow: 'hidden' }}>
-      <View style={{ width: `${Math.min(100, Math.max(0, value * 100))}%`, height: '100%', backgroundColor: color, borderRadius: R.sm }} />
+      <View style={{ width: `${Math.min(100, Math.max(0, value * 100))}%`, height: '100%', backgroundColor: color, borderRadius: R.sm, boxShadow: `0 0 8px ${color}` }} />
     </View>
   );
 }
 
 export const styles = StyleSheet.create({
-  card: { backgroundColor: C.surface, borderRadius: R.lg, padding: SP.lg, borderWidth: 1, borderColor: C.border, gap: SP.sm },
+  card: { backgroundColor: C.surface, borderRadius: R.md, padding: SP.lg, borderWidth: 1, borderColor: C.border, gap: SP.sm },
+  cardStrip: { position: 'absolute', left: -1, top: SP.md, bottom: SP.md, width: 2, borderRadius: 1 },
+  wall: { borderRadius: R.md, borderWidth: 1, borderColor: 'rgba(242,221,184,0.55)', boxShadow: '0 0 18px rgba(255,224,170,0.22)', paddingTop: 12, paddingRight: 12, paddingBottom: 12, paddingLeft: 26, overflow: 'hidden' },
+  screen: { backgroundColor: 'rgba(9,9,10,0.9)', borderRadius: R.sm, borderWidth: 1, borderColor: '#000', padding: SP.lg, gap: 6 },
   btn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 13, paddingHorizontal: 18, borderRadius: R.sm, borderWidth: 1 },
   pill: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 3, borderRadius: R.sm, alignSelf: 'flex-start' },
-  input: { backgroundColor: C.surface2, borderRadius: R.sm, borderWidth: 1, borderColor: C.border, color: C.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: F.regular },
+  input: { backgroundColor: '#0E0E10', borderRadius: R.sm, borderWidth: 1, borderColor: C.border, color: C.text, paddingHorizontal: 14, paddingVertical: 12, fontSize: 15, fontFamily: F.regular },
   chip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 8, borderRadius: R.sm, borderWidth: 1, borderColor: C.border, backgroundColor: C.surface },
   segment: { flexDirection: 'row', backgroundColor: C.surface, borderRadius: R.md, padding: 4, borderWidth: 1, borderColor: C.border },
   segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: R.sm },
@@ -432,7 +522,7 @@ export function Shortcuts({ items }: { items: { icon: IconName; label: string; o
             it.onPress();
           }}
           style={({ pressed }) => ({ flex: 1, alignItems: 'center', gap: 6, opacity: pressed ? 0.6 : 1 })}>
-          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: (it.color ?? C.accent) + '1F', alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 52, height: 52, borderRadius: 26, backgroundColor: C.surface2, borderWidth: 1, borderColor: (it.color ?? C.accent) + '66', boxShadow: `0 0 12px ${(it.color ?? C.accent)}33`, alignItems: 'center', justifyContent: 'center' }}>
             <Ionicons name={it.icon} size={22} color={it.color ?? C.accent} />
           </View>
           <Text style={{ color: C.muted, fontSize: 12, fontFamily: F.semibold, textAlign: 'center' }}>{it.label}</Text>

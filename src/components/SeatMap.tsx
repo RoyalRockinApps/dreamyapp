@@ -69,7 +69,7 @@ export function SeatMap({ claims, holderId, selected, onToggle, manage, now, hou
     let border = tierCol;
     let icon: React.ReactNode = null;
     if (isSel) {
-      bg = '#FFFFFF';
+      bg = C.accent;
       border = C.accent;
       if (size >= 16) icon = <Ionicons name="checkmark" size={size - 8} color={C.onAccent} />;
     } else if (a === 'sold') {
@@ -172,7 +172,7 @@ export function Legend({ prices }: { prices?: Record<PriceTier, number> }) {
   return (
     <View style={s.legend}>
       {(Object.keys(TIER_COLOR) as PriceTier[]).map((t) => item(TIER_COLOR[t], prices ? `${TIER_LABEL[t]} $${prices[t]}` : TIER_LABEL[t]))}
-      {item('#FFFFFF', 'Yours', true)}
+      {item(C.accent, 'Yours', true)}
       {item('#262626', 'Taken', true)}
     </View>
   );

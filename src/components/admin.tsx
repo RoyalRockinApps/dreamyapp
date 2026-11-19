@@ -6,7 +6,7 @@ import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-na
 import { LIVE } from '@/lib/backend';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C, F, R, SP } from '@/theme';
-import { Button, Card, Field, Row, Txt, type IconName } from './ui';
+import { Button, Card, Field, QuiltBackground, Row, Txt, type IconName } from './ui';
 
 export const ADMIN_SECTIONS: { href: string; key: string; title: string; icon: IconName; blurb: string }[] = [
   { href: '/admin', key: 'overview', title: 'Overview', icon: 'speedometer', blurb: 'Setup checklist and what needs attention' },
@@ -27,18 +27,21 @@ export function useIsWide() {
 export function AdminPage({ title, subtitle, children, actions }: { title: string; subtitle?: string; children: ReactNode; actions?: ReactNode }) {
   const wide = useIsWide();
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: wide ? 32 : SP.lg, gap: SP.md, paddingBottom: 64, width: '100%', maxWidth: 980 }} keyboardShouldPersistTaps="handled">
-      {(wide || subtitle || actions) && (
-        <Row style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <View style={{ flex: 1, minWidth: 220, gap: 4 }}>
-            {wide && <Txt v="h1">{title}</Txt>}
-            {subtitle ? <Txt v="muted">{subtitle}</Txt> : null}
-          </View>
-          {actions}
-        </Row>
-      )}
-      {children}
-    </ScrollView>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <QuiltBackground />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: wide ? 32 : SP.lg, gap: SP.md, paddingBottom: 64, width: '100%', maxWidth: 980 }} keyboardShouldPersistTaps="handled">
+        {(wide || subtitle || actions) && (
+          <Row style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <View style={{ flex: 1, minWidth: 220, gap: 4 }}>
+              {wide && <Txt v="h1">{title}</Txt>}
+              {subtitle ? <Txt v="muted">{subtitle}</Txt> : null}
+            </View>
+            {actions}
+          </Row>
+        )}
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -47,7 +50,7 @@ export function Sidebar() {
   const venue = useStore((s) => s.venue);
   const user = useCurrentUser();
   return (
-    <View style={{ width: 260, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border, padding: 16, gap: 4 }}>
+    <View style={{ width: 260, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: 'rgba(242,221,184,0.4)', boxShadow: '4px 0 16px rgba(255,224,170,0.08)', padding: 16, gap: 4 }}>
       <View style={{ paddingVertical: 12, gap: 2 }}>
         <Txt v="label" color={C.accent}>Admin portal</Txt>
         <Txt v="h2">{venue.name}</Txt>

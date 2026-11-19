@@ -63,7 +63,7 @@ export default function NewProduction() {
       <Row>
         {SHOW_COLORS.map((c) => (
           <Pressable key={c} onPress={() => setColor(c)}>
-            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c, borderWidth: 3, borderColor: color === c ? '#fff' : 'transparent' }} />
+            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c, borderWidth: 3, borderColor: color === c ? C.accent : 'transparent' }} />
           </Pressable>
         ))}
       </Row>
