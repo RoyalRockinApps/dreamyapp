@@ -96,7 +96,7 @@ function ReviewList({ productionId, filter }: { productionId: string; filter: Au
       {cards?.map((card) => (
         <AuditionApplicantCard key={card.personId} productionId={productionId} applicant={card} busy={loading || saving} onDecision={(decision) => void decide(card, decision)} />
       ))}
-      {loading ? <ActivityIndicator accessibilityLabel="Loading applicants" color={C.gold} /> : null}
+      {loading ? <ActivityIndicator accessibilityLabel="Loading applicants" color={C.accent} /> : null}
       {!loading && cards?.length === 0 && !hasMore && !error && (
         <Empty icon="people-outline" title={filter === 'all' ? 'No applications yet' : `No applicants in ${LABELS[filter]}`} />
       )}

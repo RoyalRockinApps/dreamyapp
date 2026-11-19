@@ -203,7 +203,7 @@ export default function PerformanceScreen() {
             <>
               <KeyValue k="Service fees" v={money(totals.fees, true)} />
               <Divider />
-              <KeyValue k="Total" v={money(totals.total, true)} strong color={C.gold} />
+              <KeyValue k="Total" v={money(totals.total, true)} strong color={C.accent} />
             </>
           )}
         </Card>
@@ -237,7 +237,7 @@ export default function PerformanceScreen() {
             <Txt v="h2">{p.title + (p.subtitle ? ` · ${p.subtitle}` : '')}</Txt>
             <Txt v="small">{`${fmtDate(p.start, { weekday: true })} · ${fmtTime(p.start)} · ${stats.available} seats left`}</Txt>
           </View>
-          {isOwner && <IconButton icon="qr-code" color={C.gold} onPress={() => router.push(`/checkin/${p.id}`)} />}
+          {isOwner && <IconButton icon="qr-code" color={C.accent} onPress={() => router.push(`/checkin/${p.id}`)} />}
           {isOwner && <IconButton icon={p.onSale ? 'pause-circle' : 'play-circle'} color={p.onSale ? C.muted : C.green} onPress={() => updatePerformance(p.id, { onSale: !p.onSale })} />}
         </Row>
         {isOwner && !p.onSale && <Txt v="small" color={C.warn}>Off sale — only the box office can sell seats.</Txt>}
@@ -256,9 +256,9 @@ export default function PerformanceScreen() {
             {mode !== 'block' && (
               <Row>
                 <Txt v="muted" style={{ flex: 1 }}>Best seats together</Txt>
-                <IconButton icon="remove-circle-outline" color={C.gold} onPress={() => setCount(String(Math.max(1, Number(count) - 1)))} />
+                <IconButton icon="remove-circle-outline" color={C.accent} onPress={() => setCount(String(Math.max(1, Number(count) - 1)))} />
                 <Txt v="h3" style={{ minWidth: 20, textAlign: 'center' }}>{count}</Txt>
-                <IconButton icon="add-circle-outline" color={C.gold} onPress={() => setCount(String(Math.min(MAX_SEATS, Number(count) + 1)))} />
+                <IconButton icon="add-circle-outline" color={C.accent} onPress={() => setCount(String(Math.min(MAX_SEATS, Number(count) + 1)))} />
                 <Button small icon="sparkles" title="Find" onPress={pickBest} />
               </Row>
             )}
@@ -312,11 +312,11 @@ function fmtCountdown(s: number) {
 
 function HoldTimer({ seconds }: { seconds: number }) {
   return (
-    <Card accent={seconds < 60 ? C.danger : C.gold} style={{ paddingVertical: 10 }}>
+    <Card accent={seconds < 60 ? C.danger : C.accent} style={{ paddingVertical: 10 }}>
       <Row>
-        <Ionicons name="timer-outline" size={20} color={seconds < 60 ? C.danger : C.gold} />
+        <Ionicons name="timer-outline" size={20} color={seconds < 60 ? C.danger : C.accent} />
         <Txt v="h3" style={{ flex: 1 }}>Seats held for you</Txt>
-        <Txt v="h2" color={seconds < 60 ? C.danger : C.gold}>{fmtCountdown(seconds)}</Txt>
+        <Txt v="h2" color={seconds < 60 ? C.danger : C.accent}>{fmtCountdown(seconds)}</Txt>
       </Row>
     </Card>
   );

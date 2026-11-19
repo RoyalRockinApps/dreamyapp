@@ -100,7 +100,7 @@ function AuditionsForPerson({ personId }: { personId: string }) {
     );
   }
   if (!data) {
-    return <Screen><ActivityIndicator accessibilityLabel="Loading auditions" color={C.gold} /></Screen>;
+    return <Screen><ActivityIndicator accessibilityLabel="Loading auditions" color={C.accent} /></Screen>;
   }
 
   const applied = new Set(data.applications.map((application) => application.productionId));
@@ -150,7 +150,7 @@ function AuditionsForPerson({ personId }: { personId: string }) {
         />
       )}
       {available.map((opening) => (
-        <Card key={opening.productionId} accent={C.gold}>
+        <Card key={opening.productionId} accent={C.accent}>
           <Txt v="h2">{opening.title}</Txt>
           {opening.details ? <Txt>{opening.details}</Txt> : null}
           {renderConfirmation(opening.productionId, 'apply') ?? <Button

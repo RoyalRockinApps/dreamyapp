@@ -7,7 +7,7 @@ import { Button, Card, Empty, KeyValue, Pill, Row, Screen, Txt } from '@/compone
 import { fmtDate, fmtTime, money } from '@/lib/dates';
 import { seatById, seatLabel, TIER_LABEL } from '@/lib/seating';
 import { useStore } from '@/store/useStore';
-import { C } from '@/theme';
+import { C, R } from '@/theme';
 
 export default function TicketScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -22,7 +22,7 @@ export default function TicketScreen() {
 
   return (
     <Screen>
-      <View style={{ backgroundColor: C.surface, borderRadius: 24, overflow: 'hidden', borderWidth: 1, borderColor: C.border }}>
+      <View style={{ backgroundColor: C.surface, borderRadius: R.xl, overflow: 'hidden', borderWidth: 1, borderColor: C.border }}>
         <View style={{ backgroundColor: C.curtain, padding: 20, gap: 4 }}>
           <Txt v="label" color="#FFD9DE">{venue.name}</Txt>
           <Txt v="h1" color="#fff">{perf.title}</Txt>
@@ -39,13 +39,13 @@ export default function TicketScreen() {
             <Info label="Seat" value={seat ? `${seat.section}${seat.number}` : '-'} big />
             <Info label="Section" value={seat?.section === 'C' ? 'Center' : seat?.section === 'L' ? 'House L' : 'House R'} />
           </Row>
-          {seat && <Pill label={TIER_LABEL[seat.tier]} color={C.gold} bg={C.goldSoft} />}
+          {seat && <Pill label={TIER_LABEL[seat.tier]} color={C.accent} bg={C.accentSoft} />}
           <View style={{ height: 1, borderStyle: 'dashed', borderWidth: 1, borderColor: C.border, marginVertical: 4 }} />
           <View style={{ alignItems: 'center', gap: 10 }}>
             {ticket.void ? (
               <Txt v="h2" color={C.danger}>VOID — refunded</Txt>
             ) : (
-              <View style={{ backgroundColor: '#fff', padding: 14, borderRadius: 16, opacity: ticket.checkedInAt ? 0.35 : 1 }}>
+              <View style={{ backgroundColor: '#fff', padding: 14, borderRadius: R.md, opacity: ticket.checkedInAt ? 0.35 : 1 }}>
                 <QRCode value={ticket.code} size={190} />
               </View>
             )}

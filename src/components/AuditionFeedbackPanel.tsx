@@ -84,7 +84,7 @@ export function AuditionFeedbackPanel({ productionId, personId, visible }: {
         setLoading(true);
         load();
       }} />
-      {loading && <ActivityIndicator accessibilityLabel="Loading casting feedback" color={C.gold} />}
+      {loading && <ActivityIndicator accessibilityLabel="Loading casting feedback" color={C.accent} />}
       {error ? <View accessibilityRole="alert"><Txt color={C.danger}>{error}</Txt></View> : null}
       {SECTIONS.map((section) => {
         const entries = items.filter((item) => item.kind === section.kind);

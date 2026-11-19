@@ -9,7 +9,7 @@ for App Review, sessions that work in every browser, and Realtime instead of pol
 | Piece | State |
 |---|---|
 | Shared database, row-level security, email + password sign-in | **Done.** `supabase/migrations/`, `src/lib/remote/`, `src/components/LiveGate.tsx` |
-| Linking a sign-in to an existing person | **Owner-approved** (`link_me()`, `link_requests`). New emails become renters immediately |
+| Linking a sign-in to an existing person | **Owner-approved** (`link_me()`, `link_requests`). New emails become renters immediately; a renter in no company only applies for auditions (`private.is_affiliated()`, `guard_outsider_sales`) |
 | Delete my account (App Store 5.1.1(v)) | **Done.** `delete_my_account()`; bookkeeping rows stay, personal details go |
 | Seat holds, sales, refunds, check-in, booking payments as server functions | **Done.** Prices and fees are computed on the server |
 | Seeing other people's changes | **Realtime** (`postgres_changes` in `src/store/sync.ts`), a full refresh every 5 minutes, and fast re-checks on the seat picker, chat and door only while Realtime is down |

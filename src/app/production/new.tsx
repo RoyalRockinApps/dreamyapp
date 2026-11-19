@@ -36,7 +36,7 @@ export default function NewProduction() {
         tagline: tagline.trim() || undefined,
         color,
         ...productionRunDates(opening, closing),
-        groups: groups.map((name) => ({ id: uid('g_'), name, color: GROUP_COLORS[PRESET_GROUPS.indexOf(name) % GROUP_COLORS.length] ?? C.gold })),
+        groups: groups.map((name) => ({ id: uid('g_'), name, color: GROUP_COLORS[PRESET_GROUPS.indexOf(name) % GROUP_COLORS.length] ?? C.accent })),
       });
       router.replace(`/production/${p.id}`);
     } catch (error) {
@@ -63,7 +63,7 @@ export default function NewProduction() {
       <Row>
         {SHOW_COLORS.map((c) => (
           <Pressable key={c} onPress={() => setColor(c)}>
-            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c, borderWidth: 3, borderColor: color === c ? '#fff' : 'transparent' }} />
+            <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: c, borderWidth: 3, borderColor: color === c ? C.accent : 'transparent' }} />
           </Pressable>
         ))}
       </Row>

@@ -5,8 +5,8 @@ import { Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-na
 
 import { LIVE } from '@/lib/backend';
 import { useCurrentUser, useStore } from '@/store/useStore';
-import { C, R, SP } from '@/theme';
-import { Button, Card, Field, Row, Txt, type IconName } from './ui';
+import { C, F, R, SP } from '@/theme';
+import { Button, Card, Field, QuiltBackground, Row, Txt, type IconName } from './ui';
 
 export const ADMIN_SECTIONS: { href: string; key: string; title: string; icon: IconName; blurb: string }[] = [
   { href: '/admin', key: 'overview', title: 'Overview', icon: 'speedometer', blurb: 'Setup checklist and what needs attention' },
@@ -27,18 +27,21 @@ export function useIsWide() {
 export function AdminPage({ title, subtitle, children, actions }: { title: string; subtitle?: string; children: ReactNode; actions?: ReactNode }) {
   const wide = useIsWide();
   return (
-    <ScrollView style={{ flex: 1, backgroundColor: C.bg }} contentContainerStyle={{ padding: wide ? 32 : SP.lg, gap: SP.md, paddingBottom: 64, width: '100%', maxWidth: 980 }} keyboardShouldPersistTaps="handled">
-      {(wide || subtitle || actions) && (
-        <Row style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
-          <View style={{ flex: 1, minWidth: 220, gap: 4 }}>
-            {wide && <Txt v="h1">{title}</Txt>}
-            {subtitle ? <Txt v="muted">{subtitle}</Txt> : null}
-          </View>
-          {actions}
-        </Row>
-      )}
-      {children}
-    </ScrollView>
+    <View style={{ flex: 1, backgroundColor: C.bg }}>
+      <QuiltBackground />
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: wide ? 32 : SP.lg, gap: SP.md, paddingBottom: 64, width: '100%', maxWidth: 980 }} keyboardShouldPersistTaps="handled">
+        {(wide || subtitle || actions) && (
+          <Row style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
+            <View style={{ flex: 1, minWidth: 220, gap: 4 }}>
+              {wide && <Txt v="h1">{title}</Txt>}
+              {subtitle ? <Txt v="muted">{subtitle}</Txt> : null}
+            </View>
+            {actions}
+          </Row>
+        )}
+        {children}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -47,9 +50,9 @@ export function Sidebar() {
   const venue = useStore((s) => s.venue);
   const user = useCurrentUser();
   return (
-    <View style={{ width: 260, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: C.border, padding: 16, gap: 4 }}>
+    <View style={{ width: 260, backgroundColor: C.surface, borderRightWidth: 1, borderRightColor: 'rgba(242,221,184,0.4)', boxShadow: '4px 0 16px rgba(255,224,170,0.08)', padding: 16, gap: 4 }}>
       <View style={{ paddingVertical: 12, gap: 2 }}>
-        <Txt v="label" color={C.gold}>Admin portal</Txt>
+        <Txt v="label" color={C.accent}>Admin portal</Txt>
         <Txt v="h2">{venue.name}</Txt>
         <Txt v="small">{`Signed in as ${user.name}`}</Txt>
       </View>
@@ -67,10 +70,10 @@ export function Sidebar() {
               paddingVertical: 10,
               borderRadius: R.md,
               // `hovered` exists on react-native-web only
-              backgroundColor: on ? C.goldSoft : (state as { hovered?: boolean }).hovered ? C.surface2 : 'transparent',
+              backgroundColor: on ? C.accentSoft : (state as { hovered?: boolean }).hovered ? C.surface2 : 'transparent',
             })}>
-            <Ionicons name={s.icon} size={18} color={on ? C.gold : C.muted} />
-            <Text style={{ color: on ? C.gold : C.text, fontWeight: on ? '700' : '500', fontSize: 14 }}>{s.title}</Text>
+            <Ionicons name={s.icon} size={18} color={on ? C.accent : C.muted} />
+            <Text style={{ color: on ? C.accent : C.text, fontFamily: on ? F.bold : F.medium, fontSize: 14 }}>{s.title}</Text>
           </Pressable>
         );
       })}
@@ -90,7 +93,7 @@ function OwnersOnly() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <Card style={{ width: '100%', maxWidth: 420, gap: 14 }}>
-        <Ionicons name="lock-closed" size={32} color={C.gold} />
+        <Ionicons name="lock-closed" size={32} color={C.accent} />
         <Txt v="h1">Owners only</Txt>
         <Txt v="muted">The admin portal is for the theatre’s owners. If you help run the theatre, ask an owner to change your role in People & access.</Txt>
         <Button variant="ghost" title="Back to the app" onPress={() => router.navigate('/')} />
@@ -109,7 +112,7 @@ function DemoPinSignIn() {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <Card style={{ width: '100%', maxWidth: 420, gap: 14 }}>
-        <Ionicons name="lock-closed" size={32} color={C.gold} />
+        <Ionicons name="lock-closed" size={32} color={C.accent} />
         <Txt v="h1">Owner sign-in</Txt>
         <Txt v="muted">The admin portal is for theatre owners and staff. Enter the admin PIN to continue.</Txt>
         <Field label="Admin PIN" value={entry} onChangeText={(t) => { setEntry(t.replace(/\D/g, '')); setError(''); }} keyboardType="number-pad" secureTextEntry maxLength={8} error={error} hint="Demo PIN is 2020 — change it in Data & security." onSubmitEditing={() => submit()} />

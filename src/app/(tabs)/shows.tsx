@@ -50,7 +50,7 @@ function ProductionCard({ p }: { p: Production }) {
     <Card onPress={() => router.push(`/production/${p.id}`)} accent={p.color}>
       <Row>
         <Txt v="h2" style={{ flex: 1 }}>{p.title}</Txt>
-        {unread > 0 && <Pill icon="chatbubble" label={String(unread)} color={C.gold} bg={C.goldSoft} />}
+        {unread > 0 && <Pill icon="chatbubble" label={String(unread)} color={C.accent} bg={C.accentSoft} />}
       </Row>
       <ProductionStageBadge stage={productionStage(p)} />
       {(milestones.length > 0 || me?.part) ? <Txt v="small">{[milestones.length ? `${done}/${milestones.length} milestones` : '', me?.part ? `You: ${me.part}` : ''].filter(Boolean).join(' · ')}</Txt> : null}

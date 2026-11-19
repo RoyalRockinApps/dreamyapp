@@ -78,7 +78,7 @@ export default function CheckIn() {
       )}
 
       {scanning && permission?.granted ? (
-        <View style={{ height: 300, borderRadius: 18, overflow: 'hidden', borderWidth: 2, borderColor: C.gold }}>
+        <View style={{ height: 300, borderRadius: 18, overflow: 'hidden', borderWidth: 2, borderColor: C.accent }}>
           <CameraView style={{ flex: 1 }} facing="back" barcodeScannerSettings={{ barcodeTypes: ['qr'] }} onBarcodeScanned={onScan} />
         </View>
       ) : null}

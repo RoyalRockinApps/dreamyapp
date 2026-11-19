@@ -46,7 +46,7 @@ export default function AdminRates() {
             <Txt v="h3">Auto-approve requests</Txt>
             <Txt v="small">On: renters can pay the deposit and confirm instantly if the date is open. Off: you approve every request first.</Txt>
           </View>
-          <Switch value={draft.autoApprove} onValueChange={set('autoApprove')} trackColor={{ true: C.gold, false: C.surface2 }} />
+          <Switch value={draft.autoApprove} onValueChange={set('autoApprove')} trackColor={{ true: C.accent, false: C.surface2 }} />
         </Row>
         <Field label="Cancellation policy" value={draft.cancellationPolicy} onChangeText={set('cancellationPolicy')} multiline hint="Renters must accept this before booking." />
         <SaveBar
@@ -67,7 +67,7 @@ export default function AdminRates() {
           <KeyValue key={l.label} k={l.label} v={money(l.amount, true)} />
         ))}
         <Divider />
-        <KeyValue k="Due to reserve (deposit + security)" v={money(example.depositDue, true)} strong color={C.gold} />
+        <KeyValue k="Due to reserve (deposit + security)" v={money(example.depositDue, true)} strong color={C.accent} />
         <KeyValue k="Balance later" v={money(example.balanceDue, true)} />
       </Card>
     </AdminPage>

@@ -75,7 +75,7 @@ export function AuditionApplicantCard({ productionId, applicant, busy, onDecisio
                 <>
                   <Txt v="h3">{applicant.name}</Txt>
                   <FullProfile personId={applicant.personId} />
-                  <Txt v="small" color={C.gold}>Tap to show summary</Txt>
+                  <Txt v="small" color={C.accent}>Tap to show summary</Txt>
                 </>
               ) : (
                 <Row gap={14} style={{ alignItems: 'flex-start' }}>
@@ -132,7 +132,7 @@ function FullProfile({ personId }: { personId: string }) {
   }, [load, personId]);
 
   if (error) return <Txt v="small" color={C.danger}>{error}</Txt>;
-  if (profile === undefined) return <ActivityIndicator accessibilityLabel="Loading performer profile" color={C.gold} />;
+  if (profile === undefined) return <ActivityIndicator accessibilityLabel="Loading performer profile" color={C.accent} />;
   if (profile === null) return <Txt v="small">This profile is no longer shared with you.</Txt>;
   return <PerformerProfileView profile={profile} />;
 }

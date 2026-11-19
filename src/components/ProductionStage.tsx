@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { Pill, Row, Txt, type IconName } from '@/components/ui';
 import { PRODUCTION_STATUSES, productionStageLabel } from '@/lib/production';
 import type { ProductionStage } from '@/lib/types';
-import { C } from '@/theme';
+import { C, F } from '@/theme';
 
 export const PRODUCTION_STAGE_STYLE: Record<ProductionStage, { color: string; bg: string; icon: IconName; short: string }> = {
   concept: { color: C.blue, bg: C.blueSoft, icon: 'bulb-outline', short: 'Concept' },
@@ -27,7 +27,7 @@ export function ProductionStageTrack({ stage }: { stage: ProductionStage }) {
         return (
           <View key={step} style={{ flex: 1, gap: 4 }} accessibilityLabel={`${productionStageLabel(step)}${i === current ? ', current stage' : ''}`}>
             <View style={{ height: 5, borderRadius: 4, backgroundColor: i === current ? meta.color : i < current ? meta.bg : C.surface2 }} />
-            <Txt v="small" color={i === current ? meta.color : C.muted} style={{ fontWeight: i === current ? '800' : '400', fontSize: 11 }}>{meta.short}</Txt>
+            <Txt v="small" color={i === current ? meta.color : C.muted} style={{ fontFamily: i === current ? F.bold : F.regular, fontSize: 11 }}>{meta.short}</Txt>
           </View>
         );
       })}

@@ -7,7 +7,7 @@
     "icon": "./assets/images/icon.png",
     "scheme": "dreamtheatre",
     "userInterfaceStyle": "dark",
-    "backgroundColor": "#0E0B1A",
+    "backgroundColor": "#000000",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.thedreamtheatre.app",
@@ -18,7 +18,7 @@
     "android": {
       "package": "com.thedreamtheatre.app",
       "adaptiveIcon": {
-        "backgroundColor": "#0E0B1A",
+        "backgroundColor": "#000000",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -34,7 +34,7 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0E0B1A",
+          "backgroundColor": "#000000",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 160
         }
