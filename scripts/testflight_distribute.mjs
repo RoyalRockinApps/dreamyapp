@@ -102,6 +102,12 @@ if (groups.length) {
       await asc('POST', '/v1/betaAppReviewSubmissions', { data: { type: 'betaAppReviewSubmissions', relationships: { build: { data: { type: 'builds', id: b.id } } } } });
       console.log('Submitted for Beta App Review; external testers get it once Apple approves it.');
     } catch (e) {
+      if (e.status === 422 && /already in beta review/i.test(e.message)) {
+        // Apple reviews one build of a version at a time; this one has to wait its turn.
+        console.log(`Not submitted yet: another build of this version is still in Beta App Review. Run this again once Apple finishes reviewing it:
+  node scripts/testflight_distribute.mjs ${build}`);
+        process.exit(2);
+      }
       if (e.status !== 409) throw e;
       console.log('Already submitted for Beta App Review.');
     }
