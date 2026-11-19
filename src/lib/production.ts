@@ -16,6 +16,15 @@ export const productionStage = (p: Production): ProductionStage => p.stage ?? (p
 export const productionStageLabel = (stage: ProductionStage): string =>
   stage === 'completed' ? STAGE_LABELS[stage] : `Stage ${PRODUCTION_STAGES.indexOf(stage)} · ${STAGE_LABELS[stage]}`;
 
+/**
+ * The app is for people affiliated with the theatre: owners and staff, cast and crew, and anyone in a
+ * production's company. Everyone else (a renter with no company) only applies for auditions here; they
+ * rent the theatre and buy tickets at thedreamtheatre.com. The database refuses their bookings, payments
+ * and ticket orders too (supabase/migrations/20261118000009_company_only_app.sql).
+ */
+export const isAffiliated = (user: User, productions: Production[]): boolean =>
+  user.role !== 'renter' || productions.some((p) => p.members.some((member) => member.userId === user.id));
+
 export const canManageProduction = (p: Production, user: User): boolean =>
   user.role === 'owner' || p.members.some((member) => member.userId === user.id && member.isDirector);
 

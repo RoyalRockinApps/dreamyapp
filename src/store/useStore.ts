@@ -8,7 +8,7 @@ import { EMPTY_CONCEPT } from '@/lib/concept';
 import { normalizeLayout, type HomeLayout } from '@/lib/home';
 import { uid, ticketCode } from '@/lib/ids';
 import { quoteRental } from '@/lib/pricing';
-import { canManageProduction, canPlanProduction, canReviewAudition, productionStage, STAGE_LABELS } from '@/lib/production';
+import { canManageProduction, canPlanProduction, canReviewAudition, isAffiliated, productionStage, STAGE_LABELS } from '@/lib/production';
 import * as api from '@/lib/remote/api';
 import { refresh, type Slice } from '@/lib/remote/bus';
 import { unavailableSeats } from '@/lib/remote/rows';
@@ -889,6 +889,14 @@ export function useCurrentUser(): User {
   const id = useStore((s) => s.currentUserId);
   const users = useStore((s) => s.users);
   return users.find((u) => u.id === id) ?? users[0];
+}
+
+/** False for someone outside the theatre (see isAffiliated): the app then only offers auditions. */
+export function useIsAffiliated(): boolean {
+  return useStore((s) => {
+    const user = s.users.find((u) => u.id === s.currentUserId) ?? s.users[0];
+    return !user || isAffiliated(user, s.productions);
+  });
 }
 
 export function useIsOwner(): boolean {

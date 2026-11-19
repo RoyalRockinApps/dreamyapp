@@ -5,7 +5,7 @@ import type { ColorValue } from 'react-native';
 
 import { IconButton, type IconName } from '@/components/ui';
 import { Wordmark } from '@/components/Wordmark';
-import { useCurrentUser, useStore } from '@/store/useStore';
+import { useCurrentUser, useIsAffiliated, useStore } from '@/store/useStore';
 import { C, F } from '@/theme';
 
 function icon(name: IconName) {
@@ -19,6 +19,8 @@ export default function TabsLayout() {
   const user = useCurrentUser();
   const role = user.role;
   const inCompany = useStore((s) => s.productions.some((p) => p.members.some((m) => m.userId === user.id)));
+  // Someone outside the theatre only gets Home (auditions and a link to thedreamtheatre.com).
+  const affiliated = useIsAffiliated();
   // Each role sees the parts of the app that matter to them.
   const show = {
     calendar: role !== 'member',
@@ -32,7 +34,7 @@ export default function TabsLayout() {
         headerStyle: { backgroundColor: C.bg },
         headerTitleStyle: { color: C.text, fontFamily: F.display },
         headerShadowVisible: false,
-        tabBarStyle: { backgroundColor: C.surface, borderTopColor: C.border },
+        tabBarStyle: affiliated ? { backgroundColor: C.surface, borderTopColor: C.border } : { display: 'none' },
         tabBarActiveTintColor: C.accent,
         tabBarInactiveTintColor: C.faint,
         tabBarLabelStyle: { fontFamily: F.semibold, letterSpacing: 0.3 },
@@ -41,13 +43,15 @@ export default function TabsLayout() {
         headerRightContainerStyle: { paddingRight: 16 },
       }}>
       <Tabs.Screen name="index" options={{ title: 'Home', headerTitle: () => <Wordmark width={170} />, tabBarIcon: icon('home') }} />
-      <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: icon('calendar'), href: show.calendar ? undefined : null }} />
-      <Tabs.Screen
-        name="rentals"
-        options={{ title: role === 'owner' ? 'Rentals' : 'Book', headerTitle: role === 'owner' ? 'Rentals' : 'Rent the Theatre', tabBarIcon: icon('key'), href: show.rentals ? undefined : null }}
-      />
-      <Tabs.Screen name="shows" options={{ title: role === 'owner' ? 'Shows' : 'My Shows', tabBarIcon: icon('people'), href: show.shows ? undefined : null }} />
-      <Tabs.Screen name="tickets" options={{ title: 'Tickets', tabBarIcon: icon('ticket') }} />
+      <Tabs.Protected guard={affiliated}>
+        <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: icon('calendar'), href: show.calendar ? undefined : null }} />
+        <Tabs.Screen
+          name="rentals"
+          options={{ title: role === 'owner' ? 'Rentals' : 'Book', headerTitle: role === 'owner' ? 'Rentals' : 'Rent the Theatre', tabBarIcon: icon('key'), href: show.rentals ? undefined : null }}
+        />
+        <Tabs.Screen name="shows" options={{ title: role === 'owner' ? 'Shows' : 'My Shows', tabBarIcon: icon('people'), href: show.shows ? undefined : null }} />
+        <Tabs.Screen name="tickets" options={{ title: 'Tickets', tabBarIcon: icon('ticket') }} />
+      </Tabs.Protected>
     </Tabs>
   );
 }

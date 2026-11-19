@@ -1,9 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useState, type ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Linking, Platform, ScrollView, View } from 'react-native';
 
 import { Button, Card, Field, Txt } from '@/components/ui';
 import { Wordmark } from '@/components/Wordmark';
+import { SITE_NAME, SITE_URL } from '@/lib/links';
 import { signIn, signUp } from '@/lib/remote/auth';
 import { VENUE } from '@/lib/seed';
 import { retryLive, signOut, useLive } from '@/store/sync';
@@ -90,8 +91,8 @@ function SignIn() {
         <Txt v="h2">{creating ? 'Create your account' : 'Sign in'}</Txt>
         <Txt v="muted">
           {creating
-            ? 'Owners, renters, cast and crew each have their own account. If the theatre already has you on file, the owner confirms it’s you.'
-            : 'Owners, renters, cast and crew sign in with their email and password.'}
+            ? 'For the theatre’s staff, cast and crew, and performers applying to audition. If the theatre already has you on file, the owner confirms it’s you.'
+            : 'Staff, cast, crew and audition applicants sign in with their email and password.'}
         </Txt>
         {creating && (
           <Field label="Your name" value={name} onChangeText={(t) => { setName(t); setError(''); }} placeholder="First and last name" autoComplete="name" textContentType="name" />
@@ -124,6 +125,8 @@ function SignIn() {
         <Button variant="ghost" title={creating ? 'I already have an account' : 'New here? Create an account'} disabled={busy} onPress={() => { setMode(creating ? 'signIn' : 'create'); setError(''); }} />
         {!creating && <Txt v="small" style={{ textAlign: 'center' }}>{`Forgot your password? Call the theatre at ${VENUE.phone}.`}</Txt>}
       </Card>
+      <Txt v="small" style={{ textAlign: 'center' }}>Renting the theatre or buying tickets?</Txt>
+      <Button variant="ghost" icon="globe-outline" title={`Visit ${SITE_NAME}`} disabled={busy} onPress={() => void Linking.openURL(SITE_URL)} />
     </Shell>
   );
 }
