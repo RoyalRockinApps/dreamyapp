@@ -282,6 +282,14 @@ test('production pitches, stages and milestones follow company and director acce
   ]);
   assert.equal(await count('stranger', "select count(*) from messages where channel_id = 'ch_draft'"), 0);
   assert.ok((await as('ben', "insert into messages (id, channel_id, person_id, body, production_stage) values ('m_fake', 'ch_draft', 'u_ben', 'Fake completed stage', 'completed')")).error, 'manual messages cannot impersonate stage updates');
+  // Tech & dress, Performances and Wrap replace the old catch-all "Production" stage
+  assert.match((await as('ben', stage('casting', 'production'))).error ?? '', /valid production stage/, 'the old Production stage is gone');
+  assert.equal((await as('ben', stage('casting', 'tech'))).error, undefined, 'a director can jump ahead');
+  assert.equal((await as('maya', "select body from messages where channel_id = 'ch_draft' and production_stage = 'tech'"))[0].body,
+    'Production stage changed from Casting to Tech & dress.');
+  assert.equal((await as('ben', stage('tech', 'casting'))).error, undefined, 'and back');
+  assert.ok((await as('ben', "insert into production_milestones (id, production_id, stage, title) values ('ms_old', 'p_draft', 'production', 'Old stage')")).error);
+  assert.equal((await as('ben', "insert into production_milestones (id, production_id, stage, title) values ('ms_strike', 'p_draft', 'wrap', 'Strike')")).error, undefined);
   assert.match((await as('ben', "update memberships set is_director = true where production_id = 'p_draft' and person_id = 'u_maya'")).error ?? '', /Only the venue owner/);
   assert.equal((await as('maya', "select pitch from production_plans where production_id = 'p_draft'"))[0].pitch, 'Pitch the show before booking dates');
   assert.ok((await as('ben', "update production_plans set stage = 'completed' where production_id = 'p_draft'")).error, 'stage changes go through the announcement transaction');
