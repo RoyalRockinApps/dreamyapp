@@ -93,6 +93,7 @@ function PersonRow({ u, shows, ownerCount }: { u: User; shows: string[]; ownerCo
           <Txt v="h3">{u.name + (u.id === me.id ? ' (you)' : '')}</Txt>
           <Txt v="small">{[u.email, u.phone].filter(Boolean).join(' · ')}</Txt>
         </View>
+        {u.teamLead && u.role !== 'owner' ? <Pill label="Team Lead" /> : null}
         {shows.slice(0, 2).map((s) => (
           <Pill key={s} label={s} />
         ))}
@@ -105,6 +106,12 @@ function PersonRow({ u, shows, ownerCount }: { u: User; shows: string[]; ownerCo
             <Field label="Phone" value={draft.phone ?? ''} onChangeText={(v) => setDraft({ ...draft, phone: v })} />
           </Grid>
           <Chips options={['owner', 'renter', 'member'] as const} value={draft.role} onChange={(r) => (lastOwner && r !== 'owner' ? alert('Keep at least one owner') : setDraft({ ...draft, role: r }))} labels={ROLE_LABEL} />
+          {draft.role !== 'owner' && (
+            <>
+              <Chips multi options={['teamLead'] as const} value={draft.teamLead ? ['teamLead'] : []} onChange={() => setDraft({ ...draft, teamLead: !draft.teamLead })} labels={{ teamLead: 'Theatre Team Lead' }} />
+              <Txt v="small">Theatre Team Leads see and manage the theatre task board with the owner and staff.</Txt>
+            </>
+          )}
           <Row style={{ justifyContent: 'flex-end' }}>
             <Button
               small

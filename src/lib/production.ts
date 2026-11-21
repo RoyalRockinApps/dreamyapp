@@ -93,7 +93,7 @@ export const productionStageLabel = (stage: ProductionStage): string =>
  * and ticket orders too (supabase/migrations/20261118000009_company_only_app.sql).
  */
 export const isAffiliated = (user: User, productions: Production[]): boolean =>
-  user.role !== 'renter' || productions.some((p) => p.members.some((member) => member.userId === user.id));
+  user.role !== 'renter' || !!user.teamLead || productions.some((p) => p.members.some((member) => member.userId === user.id));
 
 export const canManageProduction = (p: Production, user: User): boolean =>
   user.role === 'owner' || p.members.some((member) => member.userId === user.id && member.isDirector);

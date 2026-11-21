@@ -466,6 +466,56 @@ test('Concept planning is private and the audition draft needs a separate publis
   assert.ok((await as('maya', assign('u_ben'))).error);
 });
 
+test('task boards: the company reads, directors and group leads manage, everyone posts updates', async () => {
+  const card = (id: string, group: string | null, extra = '') =>
+    `insert into tasks (id, production_id, group_id, title${extra ? ', assignee_id' : ''}) values ('${id}', 'p_elf', ${group ? `'${group}'` : 'null'}, 'Card ${id}'${extra ? `, '${extra}'` : ''})`;
+  const move = (id: string, status: string) => `update tasks set status = '${status}' where id = '${id}' returning id`;
+
+  // directors and the owner manage every card; cast without a lead role only read
+  assert.ok((await as('maya', card('k_maya', null))).error, 'cast cannot add cards');
+  assert.equal((await as('ben', card('k1', null, 'u_maya'))).error, undefined);
+  assert.equal((await sys(`select created_by from tasks where id = 'k1'`))[0].created_by, 'u_ben', 'the server records who made it');
+  assert.match((await as('ben', card('k_out', null, 'u_hb'))).error ?? '', /someone who can see this board/, 'assignees come from the company');
+  assert.match((await as('ben', card('k_nogroup', 'g_nope'))).error ?? '', /groups/, 'groups come from the show');
+  assert.ok((await as('ben', `update tasks set production_id = null where id = 'k1'`)).error, 'a card stays on its board');
+
+  // a group's Team Leads manage that group's cards, and only the owner or a director makes them leads
+  const leads = (groups: string) => `update memberships set lead_group_ids = '${groups}' where production_id = 'p_elf' and person_id = 'u_maya' returning person_id`;
+  assert.equal((await as('owner', leads('{}'))).length, 1);
+  assert.ok((await as('maya', card('k_before', 'g_leads'))).error, 'not a lead yet');
+  assert.equal((await as('maya', leads('{g_leads}'))).length, 0, 'nobody makes themselves a lead');
+  assert.equal((await as('owner', leads('{g_leads}'))).length, 1);
+  assert.equal((await as('maya', card('k2', 'g_leads'))).error, undefined, 'a lead adds cards to their group');
+  assert.ok((await as('maya', card('k3', 'g_crew'))).error, 'but not to another group');
+  assert.equal((await as('maya', move('k2', 'in_progress'))).length, 1, 'and moves them');
+  assert.ok((await as('maya', `update tasks set group_id = 'g_crew' where id = 'k2'`)).error, 'without handing them to a group they don’t lead');
+  assert.equal((await as('maya', move('k1', 'completed'))).length, 0, 'cards outside their group stay put');
+  assert.equal((await as('ben', move('k1', 'completed'))).length, 1);
+
+  // everyone on the board posts updates under their own name; the latest shows who spoke last
+  const post = (who: Who, id: string, task = 'k1') => as(who, `insert into task_updates (id, task_id, person_id, author_name, body) values ('${id}', '${task}', 'u_ben', 'Ben', 'Fabric ordered')`);
+  assert.equal((await post('jordan', 'tu1')).error, undefined, 'any company member can post');
+  assert.deepEqual((await sys(`select person_id, author_name from task_updates where id = 'tu1'`))[0], { person_id: 'u_renter', author_name: 'Jordan Ellis' });
+  assert.equal((await post('maya', 'tu2')).error, undefined);
+  assert.equal((await as('ben', `select author_name from task_updates where task_id = 'k1' order by at desc, id desc limit 1`))[0].author_name, 'Maya Brooks');
+  assert.equal(await count('stranger', `select count(*) from tasks where id = 'k1'`), 0, 'outsiders see nothing');
+  assert.ok((await post('stranger', 'tu3')).error);
+  assert.equal((await as('maya', `delete from task_updates where id = 'tu1' returning id`)).length, 0, 'only the author or a card manager removes an update');
+  assert.equal((await as('jordan', `delete from task_updates where id = 'tu1' returning id`)).length, 1);
+
+  // the theatre board: owners and staff, plus people the owner marks as theatre Team Leads
+  const theatreCard = (id: string) => `insert into tasks (id, production_id, title) values ('${id}', null, 'Repaint the lobby')`;
+  const teamLead = (on: boolean) => `update people set team_lead = ${on} where id = 'u_ben' returning id`;
+  assert.equal((await as('owner', theatreCard('t1'))).error, undefined);
+  assert.equal((await as('owner', teamLead(false))).length, 1);
+  assert.equal(await count('ben', `select count(*) from tasks where id = 't1'`), 0, 'directors don’t see the theatre board by default');
+  assert.equal((await as('ben', teamLead(true))).length, 0, 'nobody makes themselves a lead');
+  assert.equal((await as('owner', teamLead(true))).length, 1);
+  assert.equal(await count('ben', `select count(*) from tasks where id = 't1'`), 1);
+  assert.equal((await as('ben', theatreCard('t2'))).error, undefined, 'theatre Team Leads manage the theatre board');
+  assert.equal(await count('maya', `select count(*) from tasks where production_id is null`), 0);
+});
+
 test('signed-out visitors cannot call the app’s functions', async () => {
   await db.exec(`begin; set local role anon;`);
   await assert.rejects(db.query(`select hold_seats('perf_elf_1', array['A-C1'])`));

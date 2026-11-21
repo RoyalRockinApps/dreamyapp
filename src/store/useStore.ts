@@ -9,6 +9,7 @@ import { normalizeLayout, type HomeLayout } from '@/lib/home';
 import { uid, ticketCode } from '@/lib/ids';
 import { quoteRental } from '@/lib/pricing';
 import { canManageProduction, canPlanProduction, canReviewAudition, isAffiliated, productionStage, STAGE_LABELS } from '@/lib/production';
+import { canManageTask, canSeeBoard } from '@/lib/tasks';
 import * as api from '@/lib/remote/api';
 import { refresh, type Slice } from '@/lib/remote/bus';
 import { unavailableSeats } from '@/lib/remote/rows';
@@ -44,6 +45,8 @@ import type {
   RentalSettings,
   Rsvp,
   ScheduleItem,
+  Task,
+  TaskUpdate,
   Ticket,
   User,
   VenueInfo,
@@ -126,6 +129,15 @@ export interface AppState {
   addConflict(c: Omit<MemberConflict, 'id'>): void;
   removeConflict(id: string): void;
   addMember(productionId: string, user: Omit<User, 'id' | 'color' | 'role'>, groupIds: string[], part?: string): Promise<void>;
+
+  // task boards (a production's, or the theatre's when productionId is missing)
+  tasks: Task[];
+  taskUpdates: TaskUpdate[];
+  addTask(task: Omit<Task, 'id' | 'createdAt' | 'updatedAt' | 'createdBy'>): Promise<string>;
+  updateTask(id: string, patch: Partial<Pick<Task, 'title' | 'notes' | 'status' | 'assigneeId' | 'dueDate' | 'groupId'>>): Promise<void>;
+  deleteTask(id: string): Promise<void>;
+  postTaskUpdate(taskId: string, body: string): Promise<void>;
+  deleteTaskUpdate(id: string): Promise<void>;
   updateCompanyMember(productionId: string, userId: string, patch: Partial<Omit<Membership, 'userId'>>): Promise<void>;
   addGroup(productionId: string, name: string): Promise<void>;
   sendMessage(channelId: string, text: string): void;
@@ -199,6 +211,8 @@ export function emptyState(): Data {
     productionAuditions: {},
     auditionEntries: [],
     linkRequests: [],
+    tasks: [],
+    taskUpdates: [],
     users: [],
     bookings: [],
     productions: [],
@@ -282,6 +296,34 @@ export const useStore = create<AppState>()(
         if (!production || !user || !canManageProduction(production, user)) throw new Error('Only a director or the venue owner can edit this production.');
         return user;
       };
+      // Task boards. The database enforces the same rules (20261119000100_task_boards.sql).
+      const taskBoard = (productionId?: string) => {
+        const { productions, users } = get();
+        const user = users.find((u) => u.id === me());
+        const production = productionId ? productions.find((p) => p.id === productionId) : undefined;
+        if (!user || (productionId && !production) || !canSeeBoard(user, production)) throw new Error('This board isn’t available to you.');
+        return { user, production };
+      };
+      const requireTaskManager = (productionId: string | undefined, groupId: string | undefined) => {
+        const { user, production } = taskBoard(productionId);
+        if (!canManageTask(user, production, groupId)) {
+          throw new Error(production ? 'Only a director, the owner or that group’s Team Lead can change this card.' : 'Only the owner, staff and Team Leads can change theatre cards.');
+        }
+        return user;
+      };
+      const findTask = (id: string) => {
+        const task = get().tasks.find((t) => t.id === id);
+        if (!task) throw new Error('This card has been removed.');
+        return task;
+      };
+      const writeTasks = async (write: () => Promise<unknown>, update: (s: AppState) => Partial<AppState>) => {
+        const who = me();
+        if (LIVE) await write();
+        if (me() !== who) return;
+        set(update);
+        if (LIVE) void refresh(['tasks']).catch(() => {});
+      };
+
       const manageProduction = async (id: string, write: () => Promise<unknown>, update: (p: Production) => Production) => {
         requireProductionManager(id);
         const who = me();
@@ -714,6 +756,47 @@ export const useStore = create<AppState>()(
             }),
           }));
         },
+        addTask: async (fields) => {
+          const user = requireTaskManager(fields.productionId, fields.groupId);
+          const title = fields.title.trim();
+          if (!title) throw new Error('Give the card a title.');
+          const at = new Date().toISOString();
+          const task: Task = { ...fields, title, notes: fields.notes.trim(), id: uid('task_'), createdBy: user.id, createdAt: at, updatedAt: at };
+          await writeTasks(() => api.insertTask(task), (s) => ({ tasks: [...s.tasks, task] }));
+          return task.id;
+        },
+        updateTask: async (id, patch) => {
+          const task = findTask(id);
+          requireTaskManager(task.productionId, task.groupId);
+          if ('groupId' in patch) requireTaskManager(task.productionId, patch.groupId);
+          const next = { ...patch, ...(patch.title !== undefined ? { title: patch.title.trim() } : {}), ...(patch.notes !== undefined ? { notes: patch.notes.trim() } : {}) };
+          if (next.title === '') throw new Error('Give the card a title.');
+          await writeTasks(() => api.updateTask(id, next), (s) => ({
+            tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...next, updatedAt: new Date().toISOString() } : t)),
+          }));
+        },
+        deleteTask: async (id) => {
+          const task = findTask(id);
+          requireTaskManager(task.productionId, task.groupId);
+          await writeTasks(() => api.deleteTask(id), (s) => ({
+            tasks: s.tasks.filter((t) => t.id !== id), taskUpdates: s.taskUpdates.filter((u) => u.taskId !== id),
+          }));
+        },
+        postTaskUpdate: async (taskId, body) => {
+          const { user } = taskBoard(findTask(taskId).productionId);
+          const text = body.trim();
+          if (!text) return;
+          const update: TaskUpdate = { id: uid('tu_'), taskId, personId: user.id, authorName: user.name, body: text, at: new Date().toISOString() };
+          await writeTasks(() => api.insertTaskUpdate(update), (s) => ({ taskUpdates: [...s.taskUpdates, update] }));
+        },
+        deleteTaskUpdate: async (id) => {
+          const update = get().taskUpdates.find((u) => u.id === id);
+          if (!update) return;
+          const task = findTask(update.taskId);
+          const { user, production } = taskBoard(task.productionId);
+          if (update.personId !== user.id && !canManageTask(user, production, task.groupId)) throw new Error('Only the person who posted it, or someone who manages the card, can remove an update.');
+          await writeTasks(() => api.deleteTaskUpdate(id), (s) => ({ taskUpdates: s.taskUpdates.filter((u) => u.id !== id) }));
+        },
         updateCompanyMember: async (productionId, userId, patch) => {
           if (patch.isDirector !== undefined && requireProductionManager(productionId).role !== 'owner') {
             throw new Error('Only the venue owner can change director access.');
@@ -877,6 +960,7 @@ const DATA_KEYS = [
   'currentUserId', 'venue', 'settings', 'users', 'bookings', 'productions', 'schedule', 'conflicts',
   'channels', 'messages', 'lastRead', 'performances', 'orders', 'tickets', 'house', 'adminPin', 'setup', 'homeLayouts',
   'productionConcepts', 'performerProfiles', 'productionAuditions', 'auditionEntries', 'linkRequests',
+  'tasks', 'taskUpdates',
 ] as const;
 
 function pickData(s: AppState): Data {

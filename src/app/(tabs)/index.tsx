@@ -7,6 +7,7 @@ import { ProductionUpdates } from '@/components/ProductionUpdates';
 import { Button, Card, Empty, Screen, ScreenWall, Txt } from '@/components/ui';
 import { MONTHS, WEEKDAYS } from '@/lib/dates';
 import { APK_URL, SITE_NAME, SITE_URL } from '@/lib/links';
+import { canSeeBoard } from '@/lib/tasks';
 import { useCurrentUser, useHomeLayout, useIsAffiliated, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
@@ -29,6 +30,7 @@ export default function Home() {
       </ScreenWall>
 
       {affiliated ? <ProductionUpdates /> : <OutsideTheTheatre />}
+      {affiliated && canSeeBoard(user) && <Button variant="secondary" icon="albums-outline" title="Theatre task board" onPress={() => router.push('/tasks')} />}
       <Button variant="secondary" icon="mic-outline" title="Find auditions" onPress={() => router.push('/auditions')} />
       {!affiliated && <Button variant="secondary" icon="person-outline" title="My performer profile" onPress={() => router.push('/performer-profile')} />}
 

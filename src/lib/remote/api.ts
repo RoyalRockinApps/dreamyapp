@@ -32,6 +32,8 @@ import type {
   RentalSettings,
   Rsvp,
   ScheduleItem,
+  Task,
+  TaskUpdate,
   User,
   VenueInfo,
 } from '../types';
@@ -257,6 +259,7 @@ export function updateCompanyMember(productionId: string, personId: string, patc
   if (patch.isDirector !== undefined) row.is_director = patch.isDirector;
   if (patch.canReviewAuditions !== undefined) row.can_review_auditions = patch.canReviewAuditions;
   if (patch.canPlanConcept !== undefined) row.can_plan_concept = patch.canPlanConcept;
+  if (patch.leadGroupIds !== undefined) row.lead_group_ids = patch.leadGroupIds;
   return run(db().from('memberships').update(row).eq('production_id', productionId).eq('person_id', personId).select('person_id').single());
 }
 
@@ -305,3 +308,19 @@ export const linkMe = () => rpc<LinkResult>('link_me', {});
 export const approveLinkRequest = (authUserId: string) => rpc('approve_link_request', { p_auth_user: authUserId });
 export const declineLinkRequest = (authUserId: string) => rpc('decline_link_request', { p_auth_user: authUserId });
 export const deleteMyAccount = () => rpc('delete_my_account', {});
+
+// ---------- task boards ----------
+
+export const insertTask = (t: Task) => run(db().from('tasks').insert(R.fromTask(t)));
+
+export function updateTask(id: string, patch: Partial<Pick<Task, 'title' | 'notes' | 'status' | 'assigneeId' | 'dueDate' | 'groupId'>>) {
+  return run(db().from('tasks').update(R.fromTask(patch)).eq('id', id).select('id').single());
+}
+
+export const deleteTask = (id: string) => run(db().from('tasks').delete().eq('id', id).select('id').single());
+
+/** The server records the poster, their name and the time. */
+export const insertTaskUpdate = (u: Pick<TaskUpdate, 'id' | 'taskId' | 'body'>) =>
+  run(db().from('task_updates').insert({ id: u.id, task_id: u.taskId, body: u.body, author_name: '' }));
+
+export const deleteTaskUpdate = (id: string) => run(db().from('task_updates').delete().eq('id', id).select('id').single());

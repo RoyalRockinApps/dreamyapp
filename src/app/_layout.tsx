@@ -84,6 +84,9 @@ export default function RootLayout() {
             <Stack.Screen name="ticket/[id]" options={{ title: 'Your Ticket' }} />
             <Stack.Screen name="checkin/[id]" options={{ title: 'Door Check-in' }} />
             <Stack.Screen name="customize" options={{ title: 'Customize home', presentation: 'modal' }} />
+            <Stack.Screen name="tasks" options={{ title: 'Theatre Tasks' }} />
+            <Stack.Screen name="task/[id]" options={{ title: 'Task' }} />
+            <Stack.Screen name="task/edit" options={{ title: 'Card', presentation: 'modal' }} />
             <Stack.Screen name="admin" options={{ headerShown: false }} />
           </Stack.Protected>
         </Stack>

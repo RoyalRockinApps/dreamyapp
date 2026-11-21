@@ -14,6 +14,8 @@ import type {
   RentalSettings,
   ScheduleItem,
   SeatClaim,
+  Task,
+  TaskUpdate,
   Ticket,
   User,
   VenueInfo,
@@ -90,6 +92,8 @@ export interface SeedData {
   performances: Performance[];
   orders: Order[];
   tickets: Ticket[];
+  tasks: Task[];
+  taskUpdates: TaskUpdate[];
 }
 
 export function buildSeed(now: Date = new Date()): SeedData {
@@ -205,6 +209,12 @@ export function buildSeed(now: Date = new Date()): SeedData {
     ],
   };
   elf.members.find((m) => m.userId === 'u_ben')!.isDirector = true;
+  // Team Leads: each manages their group's cards on the task board
+  for (const [userId, groupId] of [[MEMBER_ID, 'g_leads'], ['u_zoe', 'g_crew'], ['u_sam', 'g_band']] as const) {
+    elf.members.find((m) => m.userId === userId)!.leadGroupIds = [groupId];
+  }
+  // the stage manager also helps run the theatre: a theatre Team Lead
+  users.find((u) => u.id === 'u_ben')!.teamLead = true;
 
   const schedule: ScheduleItem[] = [];
   const rand = mulberry32(7);
@@ -326,10 +336,43 @@ export function buildSeed(now: Date = new Date()): SeedData {
   reassign('perf_nut_1', ['G-C8', 'G-C9', 'G-C10']);
   giveOrder('perf_nut_1', ['G-C8', 'G-C9', 'G-C10'], renter);
 
+  // ---------- Task boards: Elf's and the theatre's ----------
+  const hoursAgo = (hours: number) => new Date(now.getTime() - hours * 3_600_000).toISOString();
+  const task = (id: string, title: string, status: Task['status'], extra: Partial<Task> = {}): Task => ({
+    id, title, status, notes: '', createdAt: hoursAgo(72), updatedAt: hoursAgo(24), createdBy: OWNER_ID, ...extra,
+  });
+  const tasks: Task[] = [
+    task('task_lights', 'Hang and focus the lighting plot', 'in_progress', {
+      productionId: 'p_elf', groupId: 'g_crew', assigneeId: 'u_zoe', dueDate: '2026-12-05', createdBy: 'u_ben',
+      notes: 'Front-of-house positions first, then the stage wash and specials for the North Pole scenes.',
+    }),
+    task('task_blocking', 'Finish Act 2 blocking', 'in_progress', { productionId: 'p_elf', assigneeId: 'u_ben', dueDate: '2026-11-28' }),
+    task('task_harmonies', 'Learn the "Sparklejollytwinklejingley" harmonies', 'not_started', {
+      productionId: 'p_elf', groupId: 'g_leads', assigneeId: MEMBER_ID, dueDate: '2026-11-27', createdBy: MEMBER_ID,
+    }),
+    task('task_kids', 'Kids Chorus parent volunteer schedule', 'not_started', { productionId: 'p_elf', groupId: 'g_kids' }),
+    task('task_charts', 'Print the pit band charts', 'completed', { productionId: 'p_elf', groupId: 'g_band', assigneeId: 'u_sam', createdBy: 'u_sam' }),
+    task('task_aisle', 'Replace the house-left aisle lights', 'not_started', { assigneeId: OWNER_ID, dueDate: dayKey(addDays(now, 10)) }),
+    task('task_greenroom', 'Deep clean the green room', 'in_progress', { assigneeId: 'u_ben' }),
+  ];
+  const nameOf = (id: string) => users.find((u) => u.id === id)!.name;
+  const update = (id: string, taskId: string, personId: string, body: string, hours: number): TaskUpdate => ({
+    id, taskId, personId, authorName: nameOf(personId), body, at: hoursAgo(hours),
+  });
+  const taskUpdates: TaskUpdate[] = [
+    update('tu_1', 'task_lights', 'u_zoe', 'Front-of-house positions are hung. Focusing the stage wash tonight.', 26),
+    update('tu_2', 'task_lights', 'u_ben', 'Thanks, Zoe. Send me the cue sheet when it’s ready.', 3),
+    update('tu_3', 'task_blocking', OWNER_ID, 'The Act 2 opening is set; still working the finale.', 30),
+    update('tu_4', 'task_charts', 'u_sam', 'Charts are in the pit binders.', 50),
+    update('tu_5', 'task_aisle', OWNER_ID, 'Electrician booked for Tuesday morning.', 5),
+  ];
+
   return {
     users,
     bookings,
     productions: [elf],
+    tasks,
+    taskUpdates,
     schedule,
     conflicts,
     channels,

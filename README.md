@@ -62,6 +62,16 @@ ships to **iOS, Android** and the web.
 - **Messaging.** Read-only Announcements, Full Company chat, an automatic chat per group,
   and 1:1 direct messages, all with unread badges.
 
+#### Task boards
+Each production has a **Tasks** tab, and the owners and staff share a **Theatre task board** (on Home).
+Cards sit in **Not started**, **In progress** or **Completed**, with notes, an assignee and a due date.
+Everyone on a board can post updates on a card, and each card shows who posted last and when.
+
+- **A production's board:** its company and the owner see it. Directors and the owner add, move and
+  delete any card. A group's **Team Leads** (set on the Company tab) do the same for that group's cards.
+- **The theatre board:** owners, staff and anyone the owner marks as a **theatre Team Lead** in
+  People & access.
+
 ### 3. Assigned-seat ticketing and box office
 - **Movie-style seat map** of the 448-seat house (3 sections, rows A–P), with price tiers
   (Premium center C–H, Standard, Value N–P, Accessible spaces) and a zoom/whole-house toggle.
