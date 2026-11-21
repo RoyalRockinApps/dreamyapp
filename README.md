@@ -174,20 +174,33 @@ npx eas-cli@latest build --platform ios --profile ios-simulator
 Accept the CLI's install prompt when the build finishes. The simulator profile runs in demo mode
 and requires no Apple signing credentials. Use a physical iPhone to test camera-based ticket scanning.
 
-To install on an iPhone through TestFlight, use the `production` build profile. This requires
-an Apple Developer Program team and App Store Connect access. For live data, set
-`SUPABASE_URL` and `SUPABASE_PUBLISHABLE_KEY` in the Expo project's `production` environment.
+### TestFlight
 
 **App Review needs a way in.** A live build opens on the sign-in screen, so in App Store Connect →
 TestFlight → Test Information → Beta App Review Information, tick **Sign-in required** and enter the
 review account's email and password (an owner account that shows every feature; see *Live backend*).
 
+Every TestFlight release is built on a Mac and goes to the external group **DT External Testing**
+(the same procedure as the KH Royals app). The app is `com.thedreamtheatre.app` on the Apple team
+**Never Ending Technology, Inc.** (`NH4U6X4G8C`). From an up-to-date `main`, with the Supabase
+settings in `.env.local` and an App Store Connect API key in the environment (`ASC_KEY_ID`,
+`ASC_ISSUER_ID`, `ASC_KEY_PATH` = the `.p8` file, kept outside the repo):
+
 ```bash
-npx eas-cli@latest build --platform ios --profile production
-npx eas-cli@latest submit --platform ios --profile production
+APPLE_TEAM_ID=NH4U6X4G8C scripts/testflight.sh "What to test in this build"
 ```
 
-Once App Store Connect finishes processing the build, add it to a TestFlight tester group.
+- The script runs a clean prebuild, archives, and uploads with the key. It then waits for Apple to
+  process the build, sets the "What to Test" note, adds the build to DT External Testing, and
+  submits it for Beta App Review when Apple asks. Apple won't take emoji in the note, so the script
+  leaves them out.
+- For a build that's already uploaded: `node scripts/testflight_distribute.mjs <build number>
+  --note "…"`. Set `TESTFLIGHT_UPLOAD_ONLY=1` to stop the script after the upload.
+- Each upload gets a build number from the date and time (`2026.1118.2330`). The version stays
+  `app.json`'s, so Apple reviews it once, and later builds of the same version pass at once. Don't
+  mix in EAS iOS builds, whose numbers (6, 7…) are lower.
+- Make the key under **Users and Access → Integrations → App Store Connect API**. App Manager access
+  is enough; an Admin key also lets Xcode make the distribution certificate and profile.
 
 ## Run it
 
