@@ -172,7 +172,7 @@ export interface Production {
   milestones?: ProductionMilestone[];
 }
 
-export const PRODUCTION_STAGES = ['concept', 'casting', 'preparation', 'production'] as const;
+export const PRODUCTION_STAGES = ['concept', 'casting', 'preparation', 'tech', 'performances', 'wrap'] as const;
 export type MilestoneStage = (typeof PRODUCTION_STAGES)[number];
 export type ProductionStage = MilestoneStage | 'completed';
 

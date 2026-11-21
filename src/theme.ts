@@ -35,6 +35,7 @@ export const C = {
   gold: '#C9A961',
   goldSoft: 'rgba(201,169,97,0.15)',
   curtain: '#B3263A',
+  curtainSoft: 'rgba(179,38,58,0.2)',
   green: '#7DBE93',
   greenSoft: 'rgba(125,190,147,0.15)',
   warn: '#E0A458',

@@ -1,6 +1,7 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { alert } from '@/components/alert';
 import { formatProductionDay, ProductionDatePicker, ProductionRunFields } from '@/components/ProductionDates';
@@ -10,18 +11,14 @@ import { useNow } from '@/hooks/useAgenda';
 import { useConceptWorkspace } from '@/hooks/useConceptWorkspace';
 import { auditionDraftDetails, FEASIBILITY_LABELS, unresolvedFeasibility } from '@/lib/concept';
 import { dayKey, fmtRange } from '@/lib/dates';
-import { canManageProduction, canPlanProduction, canReviewAudition, PRODUCTION_STATUSES, productionRunDates, productionStage, productionStageLabel, STAGE_LABELS } from '@/lib/production';
+import {
+  canManageProduction, canPlanProduction, canReviewAudition, PRODUCTION_STATUSES, productionRunDates, productionStage, productionStageLabel,
+  STAGE_GUIDE, STAGE_LABELS, suggestedMilestones,
+} from '@/lib/production';
 import { isCalled } from '@/lib/scheduling';
-import { FEASIBILITY_ITEMS, PRODUCTION_STAGES, type MilestoneStage, type Production, type ProductionMilestone, type ProductionStage } from '@/lib/types';
+import { FEASIBILITY_ITEMS, PRODUCTION_STAGES, type MilestoneStage, type Production, type ProductionAudition, type ProductionMilestone, type ProductionStage } from '@/lib/types';
 import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
-
-const STAGE_GUIDE: Record<MilestoneStage, string> = {
-  concept: 'Pitch, rights, budget, and venue',
-  casting: 'Auditions, callbacks, and casting',
-  preparation: 'Read-through, rehearsals, and design',
-  production: 'Tech, dress, performances, and strike',
-};
 
 export function ProductionTimeline({ production: p, onSchedule }: {
   production: Production;
@@ -36,8 +33,13 @@ export function ProductionTimeline({ production: p, onSchedule }: {
   const addMilestone = useStore((s) => s.addMilestone);
   const updateMilestone = useStore((s) => s.updateMilestone);
   const removeMilestone = useStore((s) => s.removeMilestone);
+  const loadAudition = useStore((s) => s.loadProductionAudition);
+  const saveAudition = useStore((s) => s.saveProductionAudition);
   const [saving, setSaving] = useState(false);
   const [stageChoice, setStageChoice] = useState<{ from: ProductionStage; to: ProductionStage }>();
+  // Casting opens audition registration and leaving it closes it, unless the director unticks it.
+  const [audition, setAudition] = useState<ProductionAudition | null>();
+  const [syncAuditions, setSyncAuditions] = useState(true);
   const [editingPitch, setEditingPitch] = useState(false);
   const [pitch, setPitch] = useState(p.pitch ?? '');
   const [editingRun, setEditingRun] = useState(false);
@@ -81,8 +83,31 @@ export function ProductionTimeline({ production: p, onSchedule }: {
   const chooseStage = (value: ProductionStage) => {
     if (value === stage || saving) return;
     if (stage === 'concept') void refreshConcept();
+    setAudition(undefined);
+    setSyncAuditions(true);
+    if (value === 'casting' || stage === 'casting') {
+      loadAudition(p.id).then(setAudition, () => setAudition(null));
+    }
     setStageChoice({ from: stage, to: value });
   };
+
+  // What changing stage does to audition registration: open it on the way into Casting (with the
+  // saved details, or the Concept draft), close it on the way out.
+  const auditionDetails = audition?.details || draftDetails;
+  const auditionStep = !stageChoice || audition === undefined ? undefined
+    : stageChoice.to === 'casting'
+      ? audition?.isOpen ? 'alreadyOpen' : auditionDetails ? 'open' : 'noDetails'
+      : stageChoice.from === 'casting' && audition?.isOpen ? 'close' : undefined;
+
+  const confirmStage = (choice: { from: ProductionStage; to: ProductionStage }) => void save(async () => {
+    await changeStage(p.id, choice.from, choice.to);
+    if (syncAuditions && auditionStep === 'open') await saveAudition(p.id, { isOpen: true, details: auditionDetails });
+    if (syncAuditions && auditionStep === 'close' && audition) await saveAudition(p.id, { ...audition, isOpen: false });
+  }, () => setStageChoice(undefined));
+
+  const addSuggested = (phase: MilestoneStage) => void save(async () => {
+    for (const milestone of suggestedMilestones(phase, p, today)) await addMilestone(p.id, milestone);
+  });
 
   return (
     <View style={{ gap: 12 }}>
@@ -139,10 +164,13 @@ export function ProductionTimeline({ production: p, onSchedule }: {
               </>
             ))}
             {stageChoice.to === 'completed' && done < milestones.length && <Txt v="small" color={C.warn}>{`${milestones.length - done} milestones are still open.`}</Txt>}
+            {(stageChoice.to === 'casting' || stageChoice.from === 'casting') && audition === undefined && <Txt v="small">Checking audition registration…</Txt>}
+            {auditionStep === 'open' && <CheckRow on={syncAuditions} onToggle={() => setSyncAuditions(!syncAuditions)} label="Also open audition registration, so performers can apply" />}
+            {auditionStep === 'close' && <CheckRow on={syncAuditions} onToggle={() => setSyncAuditions(!syncAuditions)} label="Also close audition registration" />}
+            {auditionStep === 'alreadyOpen' && <Txt v="small" color={C.green}>Audition registration is already open.</Txt>}
+            {auditionStep === 'noDetails' && <Txt v="small">To open auditions, add audition details under Company → Audition registration.</Txt>}
             <Row style={{ flexWrap: 'wrap' }}>
-              <Button small title="Notify company and change stage" loading={saving} disabled={reviewConcept && loading} onPress={() => void save(
-                () => changeStage(p.id, stageChoice.from, stageChoice.to), () => setStageChoice(undefined),
-              )} />
+              <Button small title="Notify company and change stage" loading={saving} disabled={(reviewConcept && loading) || ((stageChoice.to === 'casting' || stageChoice.from === 'casting') && audition === undefined)} onPress={() => confirmStage(stageChoice)} />
               <Button small variant="ghost" title="Cancel" disabled={saving} onPress={() => setStageChoice(undefined)} />
             </Row>
           </View>
@@ -203,7 +231,7 @@ export function ProductionTimeline({ production: p, onSchedule }: {
         return (
           <Collapsible
             key={`${phase}:${current}`}
-            title={`Stage ${i} · ${STAGE_LABELS[phase]}${current ? ' (current)' : ''}`}
+            title={`Stage ${i + 1} · ${STAGE_LABELS[phase]}${current ? ' (current)' : ''}`}
             subtitle={items.length ? `${count} of ${items.length} complete` : STAGE_GUIDE[phase]}
             icon={count > 0 && count === items.length ? 'checkmark-circle-outline' : 'flag-outline'}
             defaultOpen={current}
@@ -245,7 +273,17 @@ export function ProductionTimeline({ production: p, onSchedule }: {
                   { text: 'Remove', style: 'destructive', onPress: () => void save(() => removeMilestone(p.id, id), () => setEditor(undefined)) },
                 ])}
               />
-            ) : <Button small variant="secondary" icon="add" title="Add milestone" disabled={saving} onPress={() => setEditor({ stage: phase })} />)}
+            ) : (
+              <>
+                {items.length === 0 && (
+                  <>
+                    <Txt v="small">{`Suggested: ${suggestedMilestones(phase, p, today).map((m) => m.title).join(', ')}.`}</Txt>
+                    <Button small icon="sparkles-outline" title="Add suggested milestones" disabled={saving} onPress={() => addSuggested(phase)} />
+                  </>
+                )}
+                <Button small variant="secondary" icon="add" title="Add milestone" disabled={saving} onPress={() => setEditor({ stage: phase })} />
+              </>
+            ))}
           </Collapsible>
         );
       })}
@@ -273,5 +311,14 @@ function MilestoneEditor({ stage, milestone, saving, onCancel, onSave, onRemove 
         {milestone && <Button small variant="danger" title="Remove" disabled={saving} onPress={() => onRemove(milestone.id)} />}
       </Row>
     </View>
+  );
+}
+
+function CheckRow({ on, label, onToggle }: { on: boolean; label: string; onToggle: () => void }) {
+  return (
+    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: on }} onPress={onToggle} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 4 }}>
+      <Ionicons name={on ? 'checkbox' : 'square-outline'} size={20} color={on ? C.accent : C.muted} />
+      <Txt v="small" color={C.text} style={{ flex: 1 }}>{label}</Txt>
+    </Pressable>
   );
 }

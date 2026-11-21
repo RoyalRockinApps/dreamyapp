@@ -9,7 +9,9 @@ export const PRODUCTION_STAGE_STYLE: Record<ProductionStage, { color: string; bg
   concept: { color: C.blue, bg: C.blueSoft, icon: 'bulb-outline', short: 'Concept' },
   casting: { color: C.purple, bg: C.purpleSoft, icon: 'people-outline', short: 'Casting' },
   preparation: { color: C.gold, bg: C.goldSoft, icon: 'construct-outline', short: 'Prep' },
-  production: { color: C.danger, bg: C.dangerSoft, icon: 'mic-outline', short: 'Production' },
+  tech: { color: C.warn, bg: C.warnSoft, icon: 'flash-outline', short: 'Tech' },
+  performances: { color: C.curtain, bg: C.curtainSoft, icon: 'mic-outline', short: 'Shows' },
+  wrap: { color: C.leather, bg: C.leatherSoft, icon: 'archive-outline', short: 'Wrap' },
   completed: { color: C.green, bg: C.greenSoft, icon: 'checkmark-circle-outline', short: 'Done' },
 };
 

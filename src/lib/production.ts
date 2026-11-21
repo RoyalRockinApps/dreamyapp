@@ -1,5 +1,5 @@
-import { atMinutes, dayKey } from './dates';
-import { PRODUCTION_STAGES, type Production, type ProductionStage, type User } from './types';
+import { addDays, atMinutes, dayKey } from './dates';
+import { PRODUCTION_STAGES, type MilestoneStage, type Production, type ProductionMilestone, type ProductionStage, type User } from './types';
 
 export const PRODUCTION_STATUSES = [...PRODUCTION_STAGES, 'completed'] as const;
 
@@ -7,14 +7,84 @@ export const STAGE_LABELS: Record<ProductionStage, string> = {
   concept: 'Concept',
   casting: 'Casting',
   preparation: 'Preparation',
-  production: 'Production',
+  tech: 'Tech & dress',
+  performances: 'Performances',
+  wrap: 'Wrap',
   completed: 'Completed',
 };
+
+/** What each stage covers, shown under the stage on the production's Timeline. */
+export const STAGE_GUIDE: Record<MilestoneStage, string> = {
+  concept: 'Pitch, rights, budget, venue, and production team',
+  casting: 'Design meetings, auditions, callbacks, and the cast list',
+  preparation: 'Rehearsals, set and costume builds, marketing, and ticket sales',
+  tech: 'Load-in, cue-to-cue, and dress rehearsals',
+  performances: 'Opening night through closing',
+  wrap: 'Strike, returns, royalties, and the company debrief',
+};
+
+/**
+ * Starter milestones for each stage, which the director can edit or remove. `days` counts from
+ * opening night (or, with `fromClosing`, from the last performance); a typical community-theatre
+ * schedule of about four months.
+ */
+export const SUGGESTED_MILESTONES: Record<MilestoneStage, { title: string; days: number; fromClosing?: boolean }[]> = {
+  concept: [
+    { title: 'Performance rights secured', days: -120 },
+    { title: 'Budget approved', days: -112 },
+    { title: 'Theatre dates held', days: -112 },
+    { title: 'Production team confirmed', days: -105 },
+  ],
+  casting: [
+    { title: 'Design concepts approved', days: -84 },
+    { title: 'Audition notice posted', days: -84 },
+    { title: 'Auditions', days: -70 },
+    { title: 'Callbacks', days: -68 },
+    { title: 'Cast list posted', days: -66 },
+  ],
+  preparation: [
+    { title: 'First read-through', days: -63 },
+    { title: 'Tickets on sale', days: -42 },
+    { title: 'Off-book', days: -28 },
+    { title: 'Program to print', days: -10 },
+    { title: 'Set and costumes finished', days: -8 },
+  ],
+  tech: [
+    { title: 'Load-in', days: -7 },
+    { title: 'Cue-to-cue', days: -5 },
+    { title: 'First dress rehearsal', days: -3 },
+    { title: 'Final dress rehearsal', days: -1 },
+  ],
+  performances: [
+    { title: 'Opening night', days: 0 },
+    { title: 'Closing performance', days: 0, fromClosing: true },
+  ],
+  wrap: [
+    { title: 'Strike', days: 1, fromClosing: true },
+    { title: 'Rentals and rights materials returned', days: 7, fromClosing: true },
+    { title: 'Royalty report filed', days: 14, fromClosing: true },
+    { title: 'Company debrief', days: 14, fromClosing: true },
+  ],
+};
+
+/**
+ * A stage's suggested milestones for this production, dated from its run when it has one. A date
+ * that has already passed is left off, so a show that's under way isn't greeted with overdue items.
+ */
+export function suggestedMilestones(stage: MilestoneStage, p: Production, today: string): Omit<ProductionMilestone, 'id' | 'completed'>[] {
+  const opening = p.openingDate ? dayKey(p.openingDate) : undefined;
+  const closing = p.closingDate ? dayKey(p.closingDate) : opening;
+  return SUGGESTED_MILESTONES[stage].map(({ title, days, fromClosing }) => {
+    const from = fromClosing ? closing : opening;
+    const due = from ? dayKey(addDays(atMinutes(from, 12 * 60), days)) : undefined;
+    return { stage, title, ...(due && due >= today ? { dueDate: due } : {}) };
+  });
+}
 
 export const productionStage = (p: Production): ProductionStage => p.stage ?? (p.openingDate ? 'preparation' : 'concept');
 
 export const productionStageLabel = (stage: ProductionStage): string =>
-  stage === 'completed' ? STAGE_LABELS[stage] : `Stage ${PRODUCTION_STAGES.indexOf(stage)} · ${STAGE_LABELS[stage]}`;
+  stage === 'completed' ? STAGE_LABELS[stage] : `Stage ${PRODUCTION_STAGES.indexOf(stage) + 1} · ${STAGE_LABELS[stage]}`;
 
 /**
  * The app is for people affiliated with the theatre: owners and staff, cast and crew, and anyone in a
