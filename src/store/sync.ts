@@ -10,6 +10,7 @@ import { AppState as RNAppState } from 'react-native';
 import { create } from 'zustand';
 
 import { LIVE } from '@/lib/backend';
+import { stopPush } from '@/lib/push';
 import * as api from '@/lib/remote/api';
 import * as auth from '@/lib/remote/auth';
 import { ALL_SLICES, setRefreshLoader, type BaseSlice, type Slice } from '@/lib/remote/bus';
@@ -283,5 +284,6 @@ export async function retryLive() {
 }
 
 export async function signOut() {
+  await stopPush(); // this phone stops getting the person's alerts
   await auth.signOut();
 }

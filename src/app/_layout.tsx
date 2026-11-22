@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { LiveGate } from '@/components/LiveGate';
+import { usePush } from '@/hooks/usePush';
 import { LIVE } from '@/lib/backend';
 import { startLive, useLive } from '@/store/sync';
 import { useIsAffiliated, useStore } from '@/store/useStore';
@@ -32,6 +33,8 @@ export default function RootLayout() {
   const fontsReady = fontsLoaded || !!fontError;
   // People outside the theatre only get Home, auditions, their performer profile and settings.
   const affiliated = useIsAffiliated();
+  const showingApp = fontsReady && (!LIVE || liveStatus === 'ready');
+  usePush(LIVE && showingApp);
 
   useEffect(() => {
     if (!fontsReady) return;

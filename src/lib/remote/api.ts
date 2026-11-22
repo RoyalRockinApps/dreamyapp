@@ -327,3 +327,10 @@ export function setAttendance(itemId: string, personId: string, mark: { status: 
     ? run(db().from('attendance').upsert({ item_id: itemId, person_id: personId, status: mark.status, note: mark.note }))
     : run(db().from('attendance').delete().eq('item_id', itemId).eq('person_id', personId));
 }
+
+// ---------- push notifications ----------
+
+/** This phone gets the signed-in person's alerts. */
+export const registerPushToken = (token: string, platform: 'ios' | 'android') => rpc('register_push_token', { p_token: token, p_platform: platform });
+/** This phone stops getting alerts (on sign-out). */
+export const unregisterPushToken = (token: string) => rpc('unregister_push_token', { p_token: token });

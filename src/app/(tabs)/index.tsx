@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Linking } from 'react-native';
 
 import { ProductionUpdates } from '@/components/ProductionUpdates';
+import { PushPrompt } from '@/components/PushSettings';
 import { AtAGlance, ContactRow, NeedsYou, NextCallCard, UpNext } from '@/components/Today';
 import { Button, Card, Screen, ScreenWall, Txt } from '@/components/ui';
 import { MONTHS, WEEKDAYS } from '@/lib/dates';
@@ -29,6 +30,7 @@ export default function Home() {
 
       {affiliated ? (
         <>
+          <PushPrompt />
           <NextCallCard />
           <NeedsYou />
           {user.role === 'owner' && <AtAGlance />}

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Linking, View } from 'react-native';
 
 import { alert } from '@/components/alert';
+import { NotificationsRow } from '@/components/PushSettings';
 import { Avatar, Button, Card, ListItem, Pill, Row, Screen, SectionHeader, Txt } from '@/components/ui';
 import { APK_URL, WEB_URL } from '@/lib/links';
 import { MEMBER_ID, OWNER_ID, RENTER_ID } from '@/lib/seed';
@@ -48,6 +49,7 @@ export default function Me() {
         {affiliated && <ListItem icon="albums-outline" title="Assigned to me" subtitle={myCards ? `${myCards} open card${myCards === 1 ? '' : 's'}` : 'Cards assigned to you'} onPress={() => router.push('/my-cards')} />}
         {affiliated && !isOwner && <ListItem icon="ticket-outline" title="My tickets" subtitle="Shows on sale and seats you’ve bought" onPress={() => router.navigate('/tickets')} />}
         {affiliated && !isOwner && (user.role === 'renter' || myBookings > 0) && <ListItem icon="key-outline" title="My bookings" subtitle="Rent the theatre and see your reservations" onPress={() => router.push('/bookings')} />}
+        {affiliated && <NotificationsRow />}
         {isOwner && <ListItem icon="settings-outline" title="Admin portal" subtitle="Venue, rates, seating, people and backups" onPress={() => router.push('/admin')} />}
       </Card>
 

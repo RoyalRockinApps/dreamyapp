@@ -53,7 +53,7 @@ before(async () => {
     create schema auth;
     create table auth.users (id uuid primary key, email text, raw_user_meta_data jsonb not null default '{}', email_confirmed_at timestamptz);
     create function auth.uid() returns uuid language sql stable as $$
-      select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid $$;
+      select nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', '')::uuid $$;
     grant usage on schema auth to anon, authenticated;
     create publication supabase_realtime;
     grant usage on schema public to anon, authenticated;
@@ -551,6 +551,74 @@ test('attendance: directors and group leads take roll, and people see their own 
   assert.equal(await count('maya', `select count(*) from attendance where item_id = 's_roll'`), 1, 'without a lead role, only her own mark');
   assert.ok((await mark('maya', lead.person_id)).error, 'and she no longer takes roll');
   assert.equal((await as('ben', `delete from attendance where item_id = 's_roll' returning person_id`)).length, 2, 'a director clears the roll');
+});
+
+test('push alerts: phones register, and announcements, calls and cards alert the right people', async () => {
+  const token = (n: string) => `ExponentPushToken[test-${n}]`;
+  const register = (who: Who, n: string) => as(who, `select register_push_token('${token(n)}', 'ios')`);
+  const last = async () => (await sys(`select person_ids, title, body, url, tokens from private.push_outbox order by id desc limit 1`))[0];
+  const sentSince = async (id: number) => sys(`select person_ids, title, body, url, tokens from private.push_outbox where id > ${id} order by id`);
+  const mark = async () => Number((await sys(`select coalesce(max(id), 0) id from private.push_outbox`))[0].id);
+
+  assert.equal((await register('maya', 'maya')).error, undefined);
+  assert.equal((await register('ben', 'ben')).error, undefined);
+  assert.equal((await register('stranger', 'stranger')).error, undefined, 'a visitor’s phone registers too, but gets no company alerts');
+  assert.match((await as('maya', `select register_push_token('not-a-token', 'ios')`)).error ?? '', /notification token/);
+  assert.ok((await as('maya', `select * from push_tokens`)).error, 'nobody reads tokens directly');
+  assert.ok((await as('maya', `insert into push_tokens (token, person_id, platform) values ('${token('y')}', 'u_ben', 'ios')`)).error, 'or writes them');
+
+  // an announcement alerts the company, but not the person who posted it
+  let before = await mark();
+  assert.equal((await as('ben', `insert into messages (id, channel_id, person_id, body) values ('m_push', 'ch_ann', 'u_ben', 'Costume fittings moved to Thursday')`)).error, undefined);
+  let sent = await sentSince(before);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].title, 'Elf: The Musical: announcement');
+  assert.equal(sent[0].url, '/chat/ch_ann');
+  const stranger = (await sys(`select id from people where auth_user_id = '${IDS.stranger}'`))[0].id;
+  assert.ok(sent[0].person_ids.includes('u_maya') && !sent[0].person_ids.includes('u_ben') && !sent[0].person_ids.includes(stranger));
+  assert.equal(sent[0].tokens, 1, 'Maya’s phone');
+  before = await mark();
+  await as('maya', `insert into messages (id, channel_id, person_id, body) values ('m_chat', 'ch_all', 'u_maya', 'See you tonight')`);
+  assert.equal((await sentSince(before)).length, 0, 'group chats don’t alert');
+
+  // a new call alerts the people called; moving it alerts them again; cancelling it too
+  before = await mark();
+  const call = `insert into schedule_items (id, production_id, title, kind, space, starts_at, ends_at, group_ids)
+                values ('s_push', 'p_elf', 'Crew build', 'Meeting', 'Shop', now() + interval '2 days', now() + interval '2 days 2 hours', '{g_crew}')`;
+  assert.equal((await as('ben', call)).error, undefined);
+  sent = await sentSince(before);
+  assert.equal(sent.length, 1);
+  assert.match(sent[0].title, /^New call: Crew build$/);
+  assert.match(sent[0].body, /^Elf: The Musical · \w{3} \w{3} \d{1,2}, \d{1,2}:\d{2} [AP]M · Shop$/);
+  assert.equal(sent[0].url, '/production/p_elf?tab=schedule&item=s_push');
+  assert.ok(!sent[0].person_ids.includes('u_maya'), 'Maya isn’t in the crew');
+  before = await mark();
+  await as('ben', `update schedule_items set notes = 'Bring gloves' where id = 's_push'`);
+  assert.equal((await sentSince(before)).length, 0, 'note changes don’t alert');
+  await as('ben', `update schedule_items set group_ids = '{g_crew,g_leads}' where id = 's_push'`);
+  sent = await sentSince(before);
+  assert.equal(sent[0].title, 'Call changed: Crew build');
+  assert.ok(sent[0].person_ids.includes('u_maya'), 'newly called people hear about it');
+  before = await mark();
+  await as('ben', `delete from schedule_items where id = 's_push'`);
+  assert.equal((await sentSince(before))[0].title, 'Call cancelled: Crew build');
+
+  // a card alerts its new assignee, unless they assigned it to themselves
+  before = await mark();
+  await as('ben', `insert into tasks (id, production_id, title, assignee_id) values ('k_push', 'p_elf', 'Hem the elf tunics', 'u_maya')`);
+  assert.deepEqual(await last(), { person_ids: ['u_maya'], title: 'New card for you', body: 'Hem the elf tunics · Elf: The Musical', url: '/task/k_push', tokens: 1 });
+  before = await mark();
+  await as('ben', `update tasks set title = 'Hem the tunics' where id = 'k_push'`);
+  await as('ben', `update tasks set assignee_id = 'u_ben' where id = 'k_push'`);
+  assert.equal((await sentSince(before)).length, 0, 'renames and self-assignments don’t alert');
+
+  // signing out stops a phone's alerts; a shared phone follows whoever signed in last
+  assert.equal((await as('maya', `select unregister_push_token('${token('maya')}')`)).error, undefined);
+  assert.equal(Number((await sys(`select count(*) n from push_tokens where person_id = 'u_maya'`))[0].n), 0);
+  assert.equal((await register('maya', 'ben')).error, undefined);
+  assert.deepEqual((await sys(`select person_id from push_tokens where token = '${token('ben')}'`))[0], { person_id: 'u_maya' });
+  assert.equal((await as('stranger', `select unregister_push_token('${token('stranger')}')`)).error, undefined);
+  assert.equal((await as('maya', `select unregister_push_token('${token('ben')}')`)).error, undefined);
 });
 
 test('signed-out visitors cannot call the app’s functions', async () => {
