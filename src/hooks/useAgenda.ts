@@ -10,6 +10,7 @@ export const KIND_COLOR: Record<AgendaItem['kind'], string> = {
   rehearsal: C.purple,
   performance: C.curtain,
   unavailable: C.faint,
+  task: C.leather,
 };
 
 export const KIND_LABEL: Record<AgendaItem['kind'], string> = {
@@ -18,6 +19,7 @@ export const KIND_LABEL: Record<AgendaItem['kind'], string> = {
   rehearsal: 'Rehearsal',
   performance: 'Performance',
   unavailable: 'Unavailable',
+  task: 'Card due',
 };
 
 export function useAgenda() {
@@ -26,7 +28,8 @@ export function useAgenda() {
   const schedule = useStore((s) => s.schedule);
   const productions = useStore((s) => s.productions);
   const performances = useStore((s) => s.performances);
-  return useMemo(() => buildAgenda({ bookings, schedule, productions, performances, user }), [bookings, schedule, productions, performances, user]);
+  const tasks = useStore((s) => s.tasks);
+  return useMemo(() => buildAgenda({ bookings, schedule, productions, performances, tasks, user }), [bookings, schedule, productions, performances, tasks, user]);
 }
 
 /** Re-render every `ms` so countdowns and "now" based views stay fresh. */

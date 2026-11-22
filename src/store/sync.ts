@@ -87,11 +87,6 @@ const loaders: Record<BaseSlice, () => Promise<Patch>> = {
   },
   orders: async () => ({ orders: (await rows<R.OrderRow>('orders', ['at', 'id'])).map(R.toOrder) }),
   tickets: async () => ({ tickets: (await rows<R.TicketRow>('tickets', ['id'])).map(R.toTicket) }),
-  layouts: async () => {
-    const out: AppState['homeLayouts'] = {};
-    for (const r of await rows<R.HomeLayoutRow>('home_layouts', ['person_id'])) out[r.person_id] = r.layout;
-    return { homeLayouts: out };
-  },
   // only the boards this person can see (row-level security)
   tasks: async () => {
     const [t, u] = await Promise.all([rows<R.TaskRow>('tasks', ['created_at', 'id']), rows<R.TaskUpdateRow>('task_updates', ['at', 'id'])]);

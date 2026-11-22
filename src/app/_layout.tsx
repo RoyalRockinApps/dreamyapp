@@ -68,7 +68,7 @@ export default function RootLayout() {
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="auditions" options={{ title: 'Auditions' }} />
           <Stack.Screen name="performer-profile" options={{ title: 'Performer Profile' }} />
-          <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+          <Stack.Screen name="settings" options={{ title: 'Me' }} />
           <Stack.Protected guard={affiliated}>
             <Stack.Screen name="booking/new" options={{ title: 'Book the Theatre', presentation: 'modal' }} />
             <Stack.Screen name="booking/[id]" options={{ title: 'Booking' }} />
@@ -83,7 +83,8 @@ export default function RootLayout() {
             <Stack.Screen name="performance/new" options={{ title: 'New Performance', presentation: 'modal' }} />
             <Stack.Screen name="ticket/[id]" options={{ title: 'Your Ticket' }} />
             <Stack.Screen name="checkin/[id]" options={{ title: 'Door Check-in' }} />
-            <Stack.Screen name="customize" options={{ title: 'Customize home', presentation: 'modal' }} />
+            <Stack.Screen name="bookings" options={{ title: 'My Bookings' }} />
+            <Stack.Screen name="my-cards" options={{ title: 'Assigned to Me' }} />
             <Stack.Screen name="tasks" options={{ title: 'Theatre Tasks' }} />
             <Stack.Screen name="task/[id]" options={{ title: 'Task' }} />
             <Stack.Screen name="task/edit" options={{ title: 'Card', presentation: 'modal' }} />

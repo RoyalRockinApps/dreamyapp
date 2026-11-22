@@ -2,7 +2,6 @@
 // Reads and live updates live in src/store/sync.ts.
 
 import { auditionSummary } from '../auditions';
-import type { HomeLayout } from '../home';
 import type { HouseConfig } from '../seating';
 import type {
   AuditionApplication,
@@ -70,12 +69,6 @@ export function updateConfig(patch: { venue?: VenueInfo; settings?: RentalSettin
 export const insertPerson = (u: User) => run(db().from('people').insert(R.fromUser(u)));
 export const updatePerson = (id: string, patch: Partial<Omit<User, 'id'>>) => run(db().from('people').update(omitId(R.fromUser({ ...patch, id }))).eq('id', id));
 export const deletePerson = (id: string) => run(db().from('people').delete().eq('id', id));
-
-export function saveHomeLayout(personId: string, layout: HomeLayout | null) {
-  return layout
-    ? run(db().from('home_layouts').upsert({ person_id: personId, layout }))
-    : run(db().from('home_layouts').delete().eq('person_id', personId));
-}
 
 // ---------- rentals ----------
 

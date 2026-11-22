@@ -1,33 +1,54 @@
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 
 import { ProductionStageBadge } from '@/components/ProductionStage';
-import { Button, Card, Empty, Pill, Row, Screen, Txt } from '@/components/ui';
+import { Button, Card, Empty, ListItem, Pill, Row, Screen, Txt } from '@/components/ui';
+import { useNow } from '@/hooks/useAgenda';
 import { useChannels } from '@/hooks/useChannels';
-import { fmtDate, fmtTime, relativeDay } from '@/lib/dates';
+import { dayKey, fmtDate, fmtTime, relativeDay } from '@/lib/dates';
 import { canManageProduction, productionStage } from '@/lib/production';
 import { isCalled } from '@/lib/scheduling';
+import { assignedTo, canSeeBoard, dueState } from '@/lib/tasks';
 import type { Production } from '@/lib/types';
 import { useCurrentUser, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
-export default function Shows() {
+/** Your productions, the theatre-wide task board, and the cards assigned to you. */
+export default function Productions() {
   const user = useCurrentUser();
   const productions = useStore((s) => s.productions);
-  const list = user.role === 'owner' ? productions : productions.filter((p) => p.members.some((m) => m.userId === user.id));
+  const tasks = useStore((s) => s.tasks);
+  const today = dayKey(useNow(60_000));
+  const isOwner = user.role === 'owner';
+  const list = isOwner ? productions : productions.filter((p) => p.members.some((m) => m.userId === user.id));
+  const mine = useMemo(() => assignedTo(tasks, user.id).open, [tasks, user.id]);
+  const late = mine.filter((t) => dueState(t, today) === 'overdue').length;
+  const theatreOpen = tasks.filter((t) => !t.productionId && t.status !== 'completed').length;
 
   return (
     <Screen>
-      {user.role === 'owner' && (
-        <Card accent={C.purple}>
-          <Txt v="h2">Your productions</Txt>
-          <Txt v="muted">Start with a pitch and plan milestones, calls, and company communications through the final performance.</Txt>
-          <Button icon="add" title="New production" onPress={() => router.push('/production/new')} />
+      {(mine.length > 0 || canSeeBoard(user)) && (
+        <Card style={{ paddingVertical: 4 }}>
+          {mine.length > 0 && (
+            <ListItem
+              icon="person-circle-outline"
+              iconColor={late ? C.warn : C.accent}
+              title="Assigned to me"
+              subtitle={`${mine.length} open card${mine.length === 1 ? '' : 's'}${late ? ` · ${late} overdue` : ''}`}
+              onPress={() => router.push('/my-cards')}
+            />
+          )}
+          {canSeeBoard(user) && (
+            <ListItem icon="albums-outline" title="Theatre task board" subtitle={`Venue work for staff and Team Leads · ${theatreOpen} open`} onPress={() => router.push('/tasks')} />
+          )}
         </Card>
       )}
-      {list.length === 0 && <Empty icon="people-outline" title="No productions yet" body={user.role === 'owner' ? 'Create one to start building your company.' : 'When a director adds you to a show it will appear here.'} />}
+
+      {list.length === 0 && <Empty icon="people-outline" title="No productions yet" body={isOwner ? 'Create one to start building your company.' : 'When a director adds you to a show it will appear here.'} />}
       {list.map((p) => (
         <ProductionCard key={p.id} p={p} />
       ))}
+      {isOwner && <Button variant="secondary" icon="add" title="New production" onPress={() => router.push('/production/new')} />}
     </Screen>
   );
 }

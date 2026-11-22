@@ -1,19 +1,17 @@
 import { router } from 'expo-router';
-import { Fragment } from 'react';
-import { Linking, Platform } from 'react-native';
+import { Linking } from 'react-native';
 
-import { HomeWidget } from '@/components/HomeWidgets';
 import { ProductionUpdates } from '@/components/ProductionUpdates';
-import { Button, Card, Empty, Screen, ScreenWall, Txt } from '@/components/ui';
+import { AtAGlance, ContactRow, NeedsYou, NextCallCard, UpNext } from '@/components/Today';
+import { Button, Card, Screen, ScreenWall, Txt } from '@/components/ui';
 import { MONTHS, WEEKDAYS } from '@/lib/dates';
-import { APK_URL, SITE_NAME, SITE_URL } from '@/lib/links';
-import { canSeeBoard } from '@/lib/tasks';
-import { useCurrentUser, useHomeLayout, useIsAffiliated, useStore } from '@/store/useStore';
+import { SITE_NAME, SITE_URL } from '@/lib/links';
+import { useCurrentUser, useIsAffiliated, useStore } from '@/store/useStore';
 import { C } from '@/theme';
 
+/** Today: your next call, what needs you, and what's coming up. The same layout for everyone in the theatre. */
 export default function Home() {
   const user = useCurrentUser();
-  const layout = useHomeLayout();
   const affiliated = useIsAffiliated();
   const venue = useStore((s) => s.venue);
   const d = new Date();
@@ -29,25 +27,22 @@ export default function Home() {
         <Txt v="muted" style={{ fontStyle: 'italic' }}>{venue.tagline}</Txt>
       </ScreenWall>
 
-      {affiliated ? <ProductionUpdates /> : <OutsideTheTheatre />}
-      {affiliated && canSeeBoard(user) && <Button variant="secondary" icon="albums-outline" title="Theatre task board" onPress={() => router.push('/tasks')} />}
-      <Button variant="secondary" icon="mic-outline" title="Find auditions" onPress={() => router.push('/auditions')} />
-      {!affiliated && <Button variant="secondary" icon="person-outline" title="My performer profile" onPress={() => router.push('/performer-profile')} />}
-
-      {!affiliated ? (
-        <HomeWidget id="contact" />
-      ) : layout.widgets.length === 0 ? (
-        <Empty icon="apps-outline" title="Your home screen is empty" body="Add the sections you want to see first." />
+      {affiliated ? (
+        <>
+          <NextCallCard />
+          <NeedsYou />
+          {user.role === 'owner' && <AtAGlance />}
+          <ProductionUpdates />
+          <UpNext />
+        </>
       ) : (
-        layout.widgets.map((id) => (
-          <Fragment key={id}>
-            <HomeWidget id={id} />
-          </Fragment>
-        ))
+        <>
+          <OutsideTheTheatre />
+          <Button variant="secondary" icon="mic-outline" title="Find auditions" onPress={() => router.push('/auditions')} />
+          <Button variant="secondary" icon="person-outline" title="My performer profile" onPress={() => router.push('/performer-profile')} />
+          <ContactRow />
+        </>
       )}
-
-      {affiliated && <Button variant="ghost" small icon="options-outline" title="Customize home" onPress={() => router.push('/customize')} />}
-      {affiliated && Platform.OS === 'web' && APK_URL ? <Button variant="ghost" small icon="logo-android" title="Get the Android app" onPress={() => Linking.openURL(APK_URL)} /> : null}
     </Screen>
   );
 }

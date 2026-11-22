@@ -1,8 +1,10 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router, Stack, useLocalSearchParams, type Href } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
+import { AddToCalendar } from '@/components/AddToCalendar';
+import { ChannelRow } from '@/components/ChannelList';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { ProductionAuditions } from '@/components/ProductionAuditions';
 import { ProductionStageBadge } from '@/components/ProductionStage';
@@ -11,22 +13,23 @@ import { TaskBoard } from '@/components/TaskBoard';
 import { Avatar, Button, Card, Chips, Collapsible, Empty, Field, ListItem, Pill, ProgressBar, Row, Screen, Segmented, Txt } from '@/components/ui';
 import { useNow } from '@/hooks/useAgenda';
 import { useChannels } from '@/hooks/useChannels';
-import { atMinutes, dayKey, fmtDate, fmtTime, relativeDay, timeAgo } from '@/lib/dates';
+import { atMinutes, dayKey, fmtDate, fmtTime, relativeDay } from '@/lib/dates';
 import { canManageProduction, canReviewAudition, canViewProduction, productionStage } from '@/lib/production';
 import { calledMemberIds, isCalled, memberConflictsFor } from '@/lib/scheduling';
 import { salesSummary } from '@/lib/seating';
 import type { MemberConflict, Production, Rsvp, ScheduleItem } from '@/lib/types';
 import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
-import { C, F } from '@/theme';
+import { C } from '@/theme';
 import { alert } from '@/components/alert';
 
-type Tab = 'timeline' | 'schedule' | 'tasks' | 'company' | 'chat' | 'tickets';
+type Tab = 'overview' | 'schedule' | 'board' | 'company' | 'chat';
+const TABS = ['overview', 'schedule', 'board', 'company', 'chat'] as const;
 
 export default function ProductionHub() {
   const params = useLocalSearchParams<{ id: string; tab?: Tab; item?: string }>();
   const user = useCurrentUser();
   const production = useStore((s) => s.productions.find((p) => p.id === params.id));
-  const [tab, setTab] = useState<Tab>(params.tab ?? (params.item ? 'schedule' : 'timeline'));
+  const [tab, setTab] = useState<Tab>(params.tab && (TABS as readonly string[]).includes(params.tab) ? params.tab : params.item ? 'schedule' : 'overview');
   const [highlight, setHighlight] = useState(params.item);
   const channels = useChannels(params.id);
   const unread = channels.reduce((s, c) => s + c.unread, 0);
@@ -36,30 +39,29 @@ export default function ProductionHub() {
   return (
     <Screen>
       <Stack.Screen options={{ title: production.title }} />
-      {tab !== 'timeline' && <ProductionStageBadge stage={productionStage(production)} />}
+      {tab !== 'overview' && <ProductionStageBadge stage={productionStage(production)} />}
       <Txt v="small">{production.openingDate && production.closingDate
         ? `Runs ${fmtDate(production.openingDate, { weekday: true })} – ${fmtDate(production.closingDate, { weekday: true })}`
         : 'Run dates to be announced'}</Txt>
-      {/* six tabs don't fit a phone's width: the strip scrolls sideways there */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, minWidth: 560 }}>
-        <View style={{ flex: 1 }}>
-          <Segmented
-            options={['timeline', 'schedule', 'tasks', 'company', 'chat', 'tickets'] as const}
-            value={tab}
-            onChange={setTab}
-            labels={{ timeline: 'Timeline', schedule: 'Schedule', tasks: 'Tasks', company: 'Company', chat: unread ? `Chat (${unread > 9 ? '9+' : unread})` : 'Chat', tickets: 'Tickets' }}
-          />
-        </View>
-      </ScrollView>
-      {tab === 'timeline' && <ProductionTimeline production={production} onSchedule={(id) => {
-        setHighlight(id);
-        setTab('schedule');
-      }} />}
+      <Segmented
+        options={TABS}
+        value={tab}
+        onChange={setTab}
+        labels={{ overview: 'Overview', schedule: 'Schedule', board: 'Board', company: 'Company', chat: unread ? `Chat (${unread > 9 ? '9+' : unread})` : 'Chat' }}
+      />
+      {tab === 'overview' && (
+        <>
+          <ProductionTimeline production={production} onSchedule={(id) => {
+            setHighlight(id);
+            setTab('schedule');
+          }} />
+          <TicketsSummary p={production} />
+        </>
+      )}
       {tab === 'schedule' && <ScheduleTab p={production} highlight={highlight} />}
-      {tab === 'tasks' && <TaskBoard productionId={production.id} />}
+      {tab === 'board' && <TaskBoard productionId={production.id} />}
       {tab === 'company' && <CompanyTab p={production} />}
       {tab === 'chat' && <ChatTab p={production} />}
-      {tab === 'tickets' && <TicketsTab p={production} />}
     </Screen>
   );
 }
@@ -156,6 +158,7 @@ function ScheduleCard({ item, p, canEdit, highlighted }: { item: ScheduleItem; p
           ))}
         </Row>
       )}
+      {amCalled && !isPast && open && <AddToCalendar item={item} production={p} />}
 
       {open && canEdit && (
         <View style={{ gap: 4, marginTop: 4 }}>
@@ -405,67 +408,66 @@ function CompanyTab({ p }: { p: Production }) {
 
 function ChatTab({ p }: { p: Production }) {
   const channels = useChannels(p.id);
-  const users = useStore((s) => s.users);
   return (
     <View style={{ gap: 8 }}>
-      {channels.map(({ channel, last, unread, title, other }) => {
-        const sender = last ? users.find((u) => u.id === last.userId) : undefined;
-        const icon = channel.kind === 'announcements' ? 'megaphone' : channel.kind === 'direct' ? 'person' : 'chatbubbles';
-        const group = p.groups.find((g) => g.id === channel.groupId);
-        return (
-          <Card key={channel.id} onPress={() => router.push(`/chat/${channel.id}`)} style={{ paddingVertical: 10 }}>
-            <Row gap={12}>
-              {other ? (
-                <Avatar name={other.name} color={other.color} />
-              ) : (
-                <View style={{ width: 36, height: 36, borderRadius: 10, backgroundColor: (group?.color ?? C.accent) + '22', alignItems: 'center', justifyContent: 'center' }}>
-                  <Ionicons name={icon} size={18} color={group?.color ?? C.accent} />
-                </View>
-              )}
-              <View style={{ flex: 1, gap: 2 }}>
-                <Row>
-                  <Txt v="h3" style={{ flex: 1 }} numberOfLines={1}>{title}</Txt>
-                  {last && <Txt v="small">{timeAgo(last.at)}</Txt>}
-                </Row>
-                <Txt v="small" numberOfLines={1}>{last ? `${sender?.name.split(' ')[0]}: ${last.text}` : 'No messages yet'}</Txt>
-              </View>
-              {unread > 0 && (
-                <View style={{ minWidth: 22, height: 22, borderRadius: 11, backgroundColor: C.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 6 }}>
-                  <Txt v="small" color={C.onAccent} style={{ fontFamily: F.bold }}>{String(unread)}</Txt>
-                </View>
-              )}
-            </Row>
-          </Card>
-        );
-      })}
-      <Txt v="small">Tip: tap the chat bubble next to anyone in the Company tab to message them directly.</Txt>
+      {channels.map((info) => (
+        <ChannelRow key={info.channel.id} info={info} production={p} />
+      ))}
+      <Txt v="small">Tip: tap the chat bubble next to anyone in the Company section to message them directly. Every chat is also in your Inbox.</Txt>
     </View>
   );
 }
 
 // ---------------- Tickets ----------------
 
-function TicketsTab({ p }: { p: Production }) {
+/** This production's performances at a glance. Selling and comps are handled in the box office. */
+function TicketsSummary({ p }: { p: Production }) {
   const user = useCurrentUser();
-  const performances = useStore((s) => s.performances).filter((x) => x.productionId === p.id).sort((a, b) => a.start.localeCompare(b.start));
+  const all = useStore((s) => s.performances);
+  const performances = useMemo(() => all.filter((x) => x.productionId === p.id).sort((a, b) => a.start.localeCompare(b.start)), [all, p.id]);
   const now = new Date();
+  const isOwner = user.role === 'owner';
+  const upcoming = performances.filter((x) => new Date(x.start) >= now);
+  if (!performances.length && !isOwner) return null;
+  const totals = upcoming.reduce((t, x) => {
+    const s = salesSummary(x.seats, now);
+    return { sold: t.sold + s.sold + s.comp, sellable: t.sellable + s.sellable };
+  }, { sold: 0, sellable: 0 });
+
   return (
-    <View style={{ gap: 10 }}>
-      {user.role === 'owner' && <Button icon="add" title="Add performance" onPress={() => router.push(`/performance/new?productionId=${p.id}` as Href)} />}
-      {performances.length === 0 && <Empty icon="ticket-outline" title="No performances yet" />}
-      {performances.map((perf) => {
+    <Card>
+      <Row>
+        <Txt v="h3" style={{ flex: 1 }}>Performances</Txt>
+        {upcoming.length > 0 && <Pill label={`${upcoming.length} upcoming`} color={C.curtain} bg={C.curtain + '22'} />}
+      </Row>
+      {upcoming.length > 0 && (
+        <>
+          <ProgressBar value={totals.sellable ? totals.sold / totals.sellable : 0} color={C.curtain} />
+          <Txt v="small">{`${totals.sold} of ${totals.sellable} seats sold or comped across the run`}</Txt>
+        </>
+      )}
+      {upcoming.slice(0, 4).map((perf) => {
         const s = salesSummary(perf.seats, now);
         return (
-          <Card key={perf.id} onPress={() => router.push(`/performance/${perf.id}`)}>
-            <Row>
-              <Txt v="h3" style={{ flex: 1 }}>{`${fmtDate(perf.start, { weekday: true })} · ${fmtTime(perf.start)}`}</Txt>
-              {perf.subtitle ? <Pill label={perf.subtitle} color={C.curtain} bg={C.curtain + '22'} /> : null}
-            </Row>
-            <ProgressBar value={(s.sold + s.comp) / s.sellable} color={C.curtain} />
-            <Txt v="small">{`${s.sold} sold · ${s.comp} comps · ${s.available} available`}</Txt>
-          </Card>
+          <ListItem
+            key={perf.id}
+            icon="ticket-outline"
+            iconColor={C.curtain}
+            title={`${fmtDate(perf.start, { weekday: true })} · ${fmtTime(perf.start)}`}
+            subtitle={`${perf.subtitle ? `${perf.subtitle} · ` : ''}${s.available} available`}
+            onPress={() => router.push(`/performance/${perf.id}`)}
+          />
         );
       })}
-    </View>
+      {performances.length === 0 && <Txt v="small">No performances yet.</Txt>}
+      {isOwner ? (
+        <Row>
+          <Button small style={{ flex: 1 }} variant="secondary" icon="add" title="Add performance" onPress={() => router.push(`/performance/new?productionId=${p.id}` as Href)} />
+          <Button small style={{ flex: 1 }} variant="secondary" icon="briefcase-outline" title="Box office" onPress={() => router.navigate('/business?view=boxOffice' as Href)} />
+        </Row>
+      ) : (
+        <Button small variant="secondary" icon="ticket-outline" title="Get tickets" onPress={() => router.navigate('/tickets')} />
+      )}
+    </Card>
   );
 }

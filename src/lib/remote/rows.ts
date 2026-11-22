@@ -1,6 +1,5 @@
 // Database rows (db/migrations) <-> app types (src/lib/types.ts). Pure functions, no I/O.
 
-import type { HomeLayout } from '../home';
 import type { HouseConfig } from '../seating';
 import type {
   Booking,
@@ -227,11 +226,6 @@ export interface TicketRow {
   price: number | string;
   checked_in_at: Nullable<string>;
   void: boolean;
-}
-
-export interface HomeLayoutRow {
-  person_id: string;
-  layout: HomeLayout;
 }
 
 // Postgres returns timestamps as "2026-11-05T23:00:00+00:00"; the app compares ISO strings, so

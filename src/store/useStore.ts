@@ -5,7 +5,6 @@ import { createJSONStorage, persist } from 'zustand/middleware';
 import { alert } from '@/components/alert';
 import { AUDITION_DETAILS_LIMIT, AUDITION_FEEDBACK_LIMIT, AUDITION_REVIEW_PAGE_SIZE, auditionSummary, hasPerformerProfile, performerProfileError } from '@/lib/auditions';
 import { EMPTY_CONCEPT } from '@/lib/concept';
-import { normalizeLayout, type HomeLayout } from '@/lib/home';
 import { uid, ticketCode } from '@/lib/ids';
 import { quoteRental } from '@/lib/pricing';
 import { canManageProduction, canPlanProduction, canReviewAudition, isAffiliated, productionStage, STAGE_LABELS } from '@/lib/production';
@@ -82,8 +81,6 @@ export interface AppState {
   setup: Record<string, boolean>;
   markSetup(key: string): void;
   /** per-person home screen layout (missing = role default) */
-  homeLayouts: Record<string, HomeLayout>;
-  setHomeLayout(userId: string, layout: HomeLayout | null): void;
   /** live mode, owner only: sign-ins waiting to be confirmed as an existing person */
   linkRequests: LinkRequest[];
   approveLink(authUserId: string): Promise<void>;
@@ -185,7 +182,6 @@ function fresh(): Data {
     house: DEFAULT_HOUSE,
     adminPin: '2020',
     setup: {},
-    homeLayouts: {},
     productionConcepts: {},
     performerProfiles: {},
     productionAuditions: {},
@@ -205,7 +201,6 @@ export function emptyState(): Data {
     house: DEFAULT_HOUSE,
     adminPin: '',
     setup: {},
-    homeLayouts: {},
     productionConcepts: {},
     performerProfiles: {},
     productionAuditions: {},
@@ -368,15 +363,6 @@ export const useStore = create<AppState>()(
         markSetup: (key) => {
           set((s) => ({ setup: { ...s.setup, [key]: true } }));
           push(null, ['config'], () => api.updateConfig({ setup: get().setup }));
-        },
-        setHomeLayout: (userId, layout) => {
-          set((s) => {
-            const next = { ...s.homeLayouts };
-            if (layout) next[userId] = layout;
-            else delete next[userId];
-            return { homeLayouts: next };
-          });
-          push('your home screen', ['layouts'], () => api.saveHomeLayout(userId, layout));
         },
         addUser: (u) => {
           const user: User = { ...u, id: uid('u_'), color: COLORS[get().users.length % COLORS.length] };
@@ -958,7 +944,7 @@ export const useStore = create<AppState>()(
 
 const DATA_KEYS = [
   'currentUserId', 'venue', 'settings', 'users', 'bookings', 'productions', 'schedule', 'conflicts',
-  'channels', 'messages', 'lastRead', 'performances', 'orders', 'tickets', 'house', 'adminPin', 'setup', 'homeLayouts',
+  'channels', 'messages', 'lastRead', 'performances', 'orders', 'tickets', 'house', 'adminPin', 'setup',
   'productionConcepts', 'performerProfiles', 'productionAuditions', 'auditionEntries', 'linkRequests',
   'tasks', 'taskUpdates',
 ] as const;
@@ -985,11 +971,4 @@ export function useIsAffiliated(): boolean {
 
 export function useIsOwner(): boolean {
   return useCurrentUser().role === 'owner';
-}
-
-/** The current person's home layout, falling back to their role's default. */
-export function useHomeLayout(): HomeLayout {
-  const user = useCurrentUser();
-  const saved = useStore((s) => s.homeLayouts[user.id]);
-  return normalizeLayout(user.role, saved);
 }

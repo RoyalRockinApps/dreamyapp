@@ -82,13 +82,15 @@ export function TaskBoard({ productionId }: { productionId?: string }) {
   );
 }
 
-function TaskCard({ task, production, users, latest, today, onMove }: {
+/** One card: its group, due date, assignee and latest update. `board` names the board it is on, for lists that mix boards. */
+export function TaskCard({ task, production, users, latest, today, onMove, board }: {
   task: Task;
   production?: Production;
   users: User[];
   latest?: { last: TaskUpdate; count: number };
   today: string;
   onMove?: () => void;
+  board?: string;
 }) {
   const group = production?.groups.find((g) => g.id === task.groupId);
   const assignee = users.find((u) => u.id === task.assigneeId);
@@ -96,6 +98,7 @@ function TaskCard({ task, production, users, latest, today, onMove }: {
   const next = NEXT[task.status];
   return (
     <Card accent={group?.color} onPress={() => router.push(`/task/${task.id}`)} style={{ gap: 8 }}>
+      {board ? <Txt v="label" color={production?.color ?? C.accent}>{board}</Txt> : null}
       <Txt v="h3">{task.title}</Txt>
       {(group || task.dueDate) && (
         <Row style={{ flexWrap: 'wrap' }}>

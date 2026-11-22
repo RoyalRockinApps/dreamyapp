@@ -27,8 +27,8 @@ export function AgendaRow({ item, showDate = true }: { item: AgendaItem; showDat
       <View style={{ width: 4, borderRadius: 2, backgroundColor: color }} />
       <View style={{ width: 64 }}>
         {showDate && <Txt v="small" color={C.accent}>{relativeDay(item.start)}</Txt>}
-        <Txt v="h3">{fmtTime(item.start)}</Txt>
-        <Txt v="small">{multi ? `→ ${fmtDate(item.end)}` : `to ${fmtTime(item.end)}`}</Txt>
+        <Txt v="h3">{item.allDay ? 'All day' : fmtTime(item.start)}</Txt>
+        {!item.allDay && <Txt v="small">{multi ? `→ ${fmtDate(item.end)}` : `to ${fmtTime(item.end)}`}</Txt>}
       </View>
       <View style={{ flex: 1, gap: 4 }}>
         <Txt v="h3" numberOfLines={2}>{item.title}</Txt>
