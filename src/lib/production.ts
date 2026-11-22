@@ -14,6 +14,36 @@ export const STAGE_LABELS: Record<ProductionStage, string> = {
 };
 
 /** What each stage covers, shown under the stage on the production's Timeline. */
+/**
+ * What a production page offers at each stage. Earlier stages' tools are put away as the show moves
+ * on and later ones appear when they're needed; a director can always move the stage back.
+ */
+export type StageFeature =
+  | 'conceptWorkspace' // brief, feasibility checks and the audition draft
+  | 'pitch'
+  | 'runDates' // editing the opening and closing dates
+  | 'auditions' // registration, applicants and review
+  | 'conflicts' // cast and crew submitting dates they can't make
+  | 'attendance' // taking roll at calls, and each person's record
+  | 'tickets' // the run's performances and sales
+  | 'addPerformances'
+  | 'scheduleCalls'
+  | 'addMembers'
+  | 'addCards'
+  | 'milestones';
+
+export const STAGE_FEATURES: Record<ProductionStage, readonly StageFeature[]> = {
+  concept: ['conceptWorkspace', 'pitch', 'runDates', 'scheduleCalls', 'addMembers', 'addCards', 'milestones'],
+  casting: ['pitch', 'runDates', 'auditions', 'scheduleCalls', 'addMembers', 'addCards', 'milestones'],
+  preparation: ['runDates', 'conflicts', 'attendance', 'tickets', 'addPerformances', 'scheduleCalls', 'addMembers', 'addCards', 'milestones'],
+  tech: ['conflicts', 'attendance', 'tickets', 'addPerformances', 'scheduleCalls', 'addMembers', 'addCards', 'milestones'],
+  performances: ['conflicts', 'attendance', 'tickets', 'addPerformances', 'scheduleCalls', 'addCards', 'milestones'],
+  wrap: ['attendance', 'tickets', 'scheduleCalls', 'addCards', 'milestones'],
+  completed: ['tickets'],
+};
+
+export const stageHas = (stage: ProductionStage, feature: StageFeature) => STAGE_FEATURES[stage].includes(feature);
+
 export const STAGE_GUIDE: Record<MilestoneStage, string> = {
   concept: 'Pitch, rights, budget, venue, and production team',
   casting: 'Design meetings, auditions, callbacks, and the cast list',

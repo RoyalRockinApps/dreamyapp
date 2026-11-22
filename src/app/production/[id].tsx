@@ -15,7 +15,7 @@ import { Avatar, Button, Card, Chips, Collapsible, Empty, Field, ListItem, Pill,
 import { useNow } from '@/hooks/useAgenda';
 import { useChannels } from '@/hooks/useChannels';
 import { atMinutes, dayKey, fmtDate, fmtTime, relativeDay } from '@/lib/dates';
-import { canManageProduction, canReviewAudition, canViewProduction, productionStage } from '@/lib/production';
+import { canManageProduction, canReviewAudition, canViewProduction, productionStage, stageHas } from '@/lib/production';
 import { calledMemberIds, isCalled, memberConflictsFor } from '@/lib/scheduling';
 import { salesSummary } from '@/lib/seating';
 import type { MemberConflict, Production, Rsvp, ScheduleItem } from '@/lib/types';
@@ -56,11 +56,11 @@ export default function ProductionHub() {
             setHighlight(id);
             setTab('schedule');
           }} />
-          <TicketsSummary p={production} />
+          {stageHas(productionStage(production), 'tickets') && <TicketsSummary p={production} />}
         </>
       )}
       {tab === 'schedule' && <ScheduleTab p={production} highlight={highlight} />}
-      {tab === 'board' && <TaskBoard productionId={production.id} />}
+      {tab === 'board' && <TaskBoard productionId={production.id} canAdd={stageHas(productionStage(production), 'addCards')} />}
       {tab === 'company' && <CompanyTab p={production} />}
       {tab === 'chat' && <ChatTab p={production} />}
     </Screen>
@@ -74,7 +74,12 @@ function ScheduleTab({ p, highlight }: { p: Production; highlight?: string }) {
   const isOwner = canManageProduction(p, user);
   const schedule = useStore((s) => s.schedule);
   const conflicts = useStore((s) => s.conflicts);
-  const [view, setView] = useState<'mine' | 'all' | 'past'>(isOwner ? 'all' : 'mine');
+  const stage = productionStage(p);
+  const [view, setView] = useState<'mine' | 'all' | 'past'>(() => {
+    // after the run there is nothing coming up: open on what happened
+    const upcoming = schedule.some((s) => s.productionId === p.id && new Date(s.end) >= new Date());
+    return !upcoming && (stage === 'wrap' || stage === 'completed') ? 'past' : isOwner ? 'all' : 'mine';
+  });
   const showPast = view === 'past';
   const mineOnly = view === 'mine';
   const now = useNow(60000);
@@ -113,8 +118,8 @@ function ScheduleTab({ p, highlight }: { p: Production; highlight?: string }) {
           ))}
         </View>
       ))}
-      {isOwner && <Button variant="secondary" icon="add" title="Schedule a call" onPress={() => router.push(`/rehearsal/edit?productionId=${p.id}` as Href)} />}
-      <ConflictsSection p={p} isOwner={isOwner} conflicts={conflicts.filter((c) => c.productionId === p.id)} />
+      {isOwner && stageHas(stage, 'scheduleCalls') && <Button variant="secondary" icon="add" title="Schedule a call" onPress={() => router.push(`/rehearsal/edit?productionId=${p.id}` as Href)} />}
+      {stageHas(stage, 'conflicts') && <ConflictsSection p={p} isOwner={isOwner} conflicts={conflicts.filter((c) => c.productionId === p.id)} />}
     </View>
   );
 }
@@ -167,7 +172,7 @@ function ScheduleCard({ item, p, canEdit, highlighted }: { item: ScheduleItem; p
       )}
       {amCalled && !isPast && open && <AddToCalendar item={item} production={p} />}
       {myMark && <Txt v="small" color={ATTENDANCE_COLOR[myMark.status]}>{`You were marked ${ATTENDANCE_LABELS[myMark.status].toLowerCase()}${myMark.note ? ` · ${myMark.note}` : ''}`}</Txt>}
-      {rollers && rollOpen(item) && (
+      {rollers && stageHas(productionStage(p), 'attendance') && rollOpen(item) && (
         <Button
           small
           variant="secondary"
@@ -250,6 +255,7 @@ function ConflictsSection({ p, isOwner, conflicts }: { p: Production; isOwner: b
 
 function CompanyTab({ p }: { p: Production }) {
   const user = useCurrentUser();
+  const stage = productionStage(p);
   const isOwner = user.role === 'owner';
   const canManage = canManageProduction(p, user);
   const users = useStore((s) => s.users);
@@ -301,11 +307,11 @@ function CompanyTab({ p }: { p: Production }) {
 
   return (
     <View style={{ gap: 12 }}>
-      {canManage && <ProductionAuditions key={`${p.id}:${user.id}`} productionId={p.id} includeConceptDraft={productionStage(p) !== 'concept'} />}
-      {canReviewAudition(p, user) && (
+      {canManage && stageHas(stage, 'auditions') && <ProductionAuditions key={`${p.id}:${user.id}`} productionId={p.id} includeConceptDraft />}
+      {stageHas(stage, 'auditions') && canReviewAudition(p, user) && (
         <Button variant="secondary" icon="albums-outline" title="Review audition applicants" onPress={() => router.push({ pathname: '/production/audition-review', params: { productionId: p.id } })} />
       )}
-      {canManage && (
+      {canManage && stageHas(stage, 'addMembers') && (
         <Row>
           <Button style={{ flex: 1 }} icon="person-add" title="Add member" onPress={() => setAdding(!adding)} />
         </Row>
@@ -360,7 +366,7 @@ function CompanyTab({ p }: { p: Production }) {
                       <Txt v="h3">{u.name + (u.id === user.id ? ' (you)' : '')}</Txt>
                       {m.part ? <Txt v="small">{m.part}</Txt> : null}
                       {!!m.leadGroupIds?.length && <Txt v="small">{`Team Lead · ${m.leadGroupIds.map((id) => groupLabels[id]).filter(Boolean).join(', ')}`}</Txt>}
-                      {(u.id === user.id || canTakeAttendance(user, p, u.id)) && countsLabel(attendanceCounts(attendance, u.id, itemIds)) ? (
+                      {stageHas(stage, 'attendance') && (u.id === user.id || canTakeAttendance(user, p, u.id)) && countsLabel(attendanceCounts(attendance, u.id, itemIds)) ? (
                         <Txt v="small" color={C.muted}>{`Attendance: ${countsLabel(attendanceCounts(attendance, u.id, itemIds))}`}</Txt>
                       ) : null}
                       {m.canReviewAuditions && !m.isDirector && <Txt v="small">Audition reviewer</Txt>}
@@ -452,7 +458,9 @@ function TicketsSummary({ p }: { p: Production }) {
   const isOwner = user.role === 'owner';
   const upcoming = performances.filter((x) => new Date(x.start) >= now);
   if (!performances.length && !isOwner) return null;
-  const totals = upcoming.reduce((t, x) => {
+  // while shows are ahead, what's left to sell; once the run is over, how it sold
+  const shown = upcoming.length ? upcoming : performances;
+  const totals = shown.reduce((t, x) => {
     const s = salesSummary(x.seats, now);
     return { sold: t.sold + s.sold + s.comp, sellable: t.sellable + s.sellable };
   }, { sold: 0, sellable: 0 });
@@ -461,15 +469,15 @@ function TicketsSummary({ p }: { p: Production }) {
     <Card>
       <Row>
         <Txt v="h3" style={{ flex: 1 }}>Performances</Txt>
-        {upcoming.length > 0 && <Pill label={`${upcoming.length} upcoming`} color={C.curtain} bg={C.curtain + '22'} />}
+        {shown.length > 0 && <Pill label={upcoming.length ? `${upcoming.length} upcoming` : 'Run complete'} color={C.curtain} bg={C.curtain + '22'} />}
       </Row>
-      {upcoming.length > 0 && (
+      {shown.length > 0 && (
         <>
           <ProgressBar value={totals.sellable ? totals.sold / totals.sellable : 0} color={C.curtain} />
-          <Txt v="small">{`${totals.sold} of ${totals.sellable} seats sold or comped across the run`}</Txt>
+          <Txt v="small">{`${totals.sold} of ${totals.sellable} seats sold or comped ${upcoming.length ? 'for the shows ahead' : 'across the run'}`}</Txt>
         </>
       )}
-      {upcoming.slice(0, 4).map((perf) => {
+      {(upcoming.length ? upcoming.slice(0, 4) : []).map((perf) => {
         const s = salesSummary(perf.seats, now);
         return (
           <ListItem
@@ -485,7 +493,7 @@ function TicketsSummary({ p }: { p: Production }) {
       {performances.length === 0 && <Txt v="small">No performances yet.</Txt>}
       {isOwner ? (
         <Row>
-          <Button small style={{ flex: 1.35 }} variant="secondary" icon="add" title="Add performance" onPress={() => router.push(`/performance/new?productionId=${p.id}` as Href)} />
+          {stageHas(productionStage(p), 'addPerformances') && <Button small style={{ flex: 1.35 }} variant="secondary" icon="add" title="Add performance" onPress={() => router.push(`/performance/new?productionId=${p.id}` as Href)} />}
           <Button small style={{ flex: 1 }} variant="secondary" icon="briefcase-outline" title="Box office" onPress={() => router.navigate('/business?view=boxOffice' as Href)} />
         </Row>
       ) : (

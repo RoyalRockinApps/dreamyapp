@@ -17,8 +17,9 @@ const NEXT: Partial<Record<TaskStatus, TaskStatus>> = { not_started: 'in_progres
 /**
  * A task board: cards in Not started, In progress and Completed. A production's board when given
  * its id, otherwise the theatre's. Phones show one column at a time; wide screens show all three.
+ * `canAdd` false hides New card (a production that's complete).
  */
-export function TaskBoard({ productionId }: { productionId?: string }) {
+export function TaskBoard({ productionId, canAdd = true }: { productionId?: string; canAdd?: boolean }) {
   const user = useCurrentUser();
   const production = useStore((s) => (productionId ? s.productions.find((p) => p.id === productionId) : undefined));
   const allTasks = useStore((s) => s.tasks);
@@ -55,7 +56,7 @@ export function TaskBoard({ productionId }: { productionId?: string }) {
 
   return (
     <View style={{ gap: 12 }}>
-      {canAddTasks(user, production) && (
+      {canAdd && canAddTasks(user, production) && (
         <Button icon="add" title="New card" onPress={() => router.push({ pathname: '/task/edit', params: productionId ? { productionId } : {} })} />
       )}
       {width >= 900 ? (

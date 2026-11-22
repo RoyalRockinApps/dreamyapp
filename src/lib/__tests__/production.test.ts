@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
 import { localIso } from '../dates';
-import { PRODUCTION_STATUSES, productionStageLabel, STAGE_GUIDE, SUGGESTED_MILESTONES, suggestedMilestones } from '../production';
+import { PRODUCTION_STATUSES, productionStageLabel, STAGE_FEATURES, STAGE_GUIDE, stageHas, SUGGESTED_MILESTONES, suggestedMilestones, type StageFeature } from '../production';
 import { PRODUCTION_STAGES, type Production } from '../types';
 
 const show = (opening?: [number, number, number], closing?: [number, number, number]): Production => ({
@@ -36,4 +36,17 @@ test('suggested milestones are dated from the run, and past dates are left off',
   const lateStart = suggestedMilestones('concept', p, '2027-04-01');
   assert.ok(lateStart.every((m) => m.dueDate === undefined), 'a show already under way gets no overdue suggestions');
   assert.ok(suggestedMilestones('casting', show(), '2026-01-01').every((m) => m.dueDate === undefined), 'no run dates, no due dates');
+});
+
+test('each stage reveals only its own tools', () => {
+  const stagesWith = (f: StageFeature) => PRODUCTION_STATUSES.filter((s) => stageHas(s, f));
+  assert.deepEqual(stagesWith('conceptWorkspace'), ['concept']);
+  assert.deepEqual(stagesWith('auditions'), ['casting'], 'auditions open and close with Casting');
+  assert.deepEqual(stagesWith('pitch'), ['concept', 'casting']);
+  assert.deepEqual(stagesWith('conflicts'), ['preparation', 'tech', 'performances'], 'conflicts while there are rehearsals and shows');
+  assert.deepEqual(stagesWith('attendance'), ['preparation', 'tech', 'performances', 'wrap'], 'roll from the first rehearsal to strike');
+  assert.deepEqual(stagesWith('tickets'), ['preparation', 'tech', 'performances', 'wrap', 'completed'], 'sales from the day tickets go on sale');
+  assert.deepEqual(stagesWith('addPerformances'), ['preparation', 'tech', 'performances']);
+  assert.deepEqual(stagesWith('milestones'), [...PRODUCTION_STAGES], 'every working stage has its own milestones');
+  assert.deepEqual(STAGE_FEATURES.completed, ['tickets'], 'a finished show is a record: just how it sold');
 });

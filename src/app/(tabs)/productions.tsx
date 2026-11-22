@@ -64,7 +64,9 @@ function ProductionCard({ p }: { p: Production }) {
   const next = upcoming[0];
   const unread = channels.reduce((s, c) => s + c.unread, 0);
   const me = p.members.find((m) => m.userId === user.id);
-  const milestones = p.milestones ?? [];
+  const stage = productionStage(p);
+  // only the current stage's milestones, as on the production's Overview
+  const milestones = (p.milestones ?? []).filter((m) => m.stage === stage);
   const done = milestones.filter((m) => m.completed).length;
 
   return (
@@ -73,8 +75,8 @@ function ProductionCard({ p }: { p: Production }) {
         <Txt v="h2" style={{ flex: 1 }}>{p.title}</Txt>
         {unread > 0 && <Pill icon="chatbubble" label={String(unread)} color={C.accent} bg={C.accentSoft} />}
       </Row>
-      <ProductionStageBadge stage={productionStage(p)} />
-      {(milestones.length > 0 || me?.part) ? <Txt v="small">{[milestones.length ? `${done}/${milestones.length} milestones` : '', me?.part ? `You: ${me.part}` : ''].filter(Boolean).join(' · ')}</Txt> : null}
+      <ProductionStageBadge stage={stage} />
+      {(milestones.length > 0 || me?.part) ? <Txt v="small">{[milestones.length ? `${done} of ${milestones.length} stage milestones done` : '', me?.part ? `You: ${me.part}` : ''].filter(Boolean).join(' · ')}</Txt> : null}
       {p.openingDate && p.closingDate && <Txt v="small">{`${fmtDate(p.openingDate)} – ${fmtDate(p.closingDate)}`}</Txt>}
       {next && <Txt v="small" color={C.purple}>{`Next: ${next.title} · ${relativeDay(next.start)} ${fmtTime(next.start)}`}</Txt>}
     </Card>
