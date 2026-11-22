@@ -259,6 +259,32 @@ npx expo lint
 
 Demo payments: card `4242 4242 4242 4242`, any future expiry. `4000 0000 0000 0002` simulates a decline.
 
+### Test data: Ballad of Ricky Bobby at any stage
+`npm run test-data:ricky` fills the live theatre's "Ballad of Ricky Bobby" with a whole production at
+the stage you choose. The run is dated around today so today falls in that stage. Earlier stages are
+filled in as history; later ones are planned.
+
+```bash
+npm run test-data:ricky -- --stage casting        # concept, casting, preparation, tech, performances, wrap, completed
+npm run test-data:ricky -- --remove               # clear the test data; the show goes back to Concept
+```
+
+| Stage | What's there |
+|---|---|
+| Concept | Pitch, concept brief, feasibility checks (one blocked), production team, kickoff meetings, concept cards |
+| Casting | Auditions open with 28 applicants (headshots, skills, credits), callbacks and passes, review notes, crew hired |
+| Preparation | Full company of 35 with groups and Team Leads, rehearsal calendar with RSVPs, conflicts and attendance, cards, chat, tickets on sale |
+| Tech & dress | Load-in, cue-to-cue and dress rehearsals, most seats sold |
+| Performances | Six shows over two weekends; past ones checked in at the door |
+| Wrap / Completed | Strike, returns and royalty cards; the full run's sales and attendance |
+
+The show keeps its title, tagline, pitch and its own members (the owner as director). Its run dates
+and groups become the test ones. The 41 test people have `rb.*@example.com` addresses and ids
+starting `rb_`. No alerts are sent while it loads. Its ticket sales count toward the owner's money and
+box office totals, so remove it (or switch stages) when you're done. The loader is
+`scripts/ricky-bobby.ts`; the data is built in `scripts/test-data/ricky-bobby.ts`, and
+`npm run test:db` loads every stage on an in-process Postgres.
+
 ---
 
 ## Project layout

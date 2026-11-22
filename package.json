@@ -62,7 +62,8 @@
     "lint": "expo lint",
     "test:db": "tsx --test supabase/tests/*.test.ts",
     "db:migrate": "supabase db push --remote",
-    "db:seed": "node --env-file-if-exists=.env.local --import tsx scripts/db.ts seed"
+    "db:seed": "node --env-file-if-exists=.env.local --import tsx scripts/db.ts seed",
+    "test-data:ricky": "tsx scripts/ricky-bobby.ts"
   },
   "private": true
 }

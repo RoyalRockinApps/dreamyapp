@@ -12,6 +12,9 @@ import { join } from 'node:path';
 import { before, test } from 'node:test';
 
 import { seedSql } from '../../scripts/seed-sql';
+import { RB_PRODUCTION, RB_STAGES, rickyBobbyRemoveSql, rickyBobbySql, type RbStage } from '../../scripts/test-data/ricky-bobby';
+
+const at = (s: RbStage) => RB_STAGES.indexOf(s);
 
 type Row = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
@@ -642,4 +645,87 @@ test('people can delete their own account; the last owner cannot', async () => {
   const p = (await sys(`select name, email, phone, auth_user_id from people where id = '${before}'`))[0];
   assert.deepEqual([p.name, p.auth_user_id, p.phone], ['Deleted account', null, null], 'personal details removed');
   assert.match(p.email, /^deleted\+.+@invalid\.local$/);
+});
+
+test('the Ricky Bobby test show loads at every stage, quietly, and removes cleanly', async () => {
+  const before = async () => ({
+    people: Number((await sys(`select count(*) n from people where id not like 'rb\\_%'`))[0].n),
+    outbox: Number((await sys(`select count(*) n from private.push_outbox`))[0].n),
+  });
+  const start = await before();
+  const now = new Date();
+  for (const stage of RB_STAGES) {
+    await db.exec(rickyBobbySql({ stage, now, readers: ['u_owner'] }));
+    const one = async (sql: string) => { const [row] = await sys(sql); return row ? Object.values(row)[0] : undefined; };
+    assert.equal(await one(`select stage from production_plans where production_id = '${RB_PRODUCTION}'`), stage, `${stage}: plan`);
+    const n = async (sql: string) => Number(await one(sql));
+    const people = await n(`select count(*) from people where id like 'rb\\_%'`);
+    const members = await n(`select count(*) from memberships where production_id = '${RB_PRODUCTION}'`);
+    const applicants = await n(`select count(*) from audition_applications where production_id = '${RB_PRODUCTION}'`);
+    const calls = await n(`select count(*) from schedule_items where production_id = '${RB_PRODUCTION}'`);
+    const roll = await n(`select count(*) from attendance a join schedule_items s on s.id = a.item_id where s.production_id = '${RB_PRODUCTION}'`);
+    const tickets = await n(`select count(*) from tickets t join performances p on p.id = t.performance_id where p.production_id = '${RB_PRODUCTION}'`);
+    const checkedIn = await n(`select count(*) from tickets t join performances p on p.id = t.performance_id where p.production_id = '${RB_PRODUCTION}' and t.checked_in_at is not null`);
+    const open = await one(`select is_open from production_auditions where production_id = '${RB_PRODUCTION}'`);
+    const late = await n(`select count(*) from tasks where production_id = '${RB_PRODUCTION}' and created_at > now() + interval '1 minute'`);
+    assert.equal(late, 0, `${stage}: nothing is dated in the future except plans`);
+    if (stage === 'concept') {
+      assert.equal(members, 5, 'just the production team');
+      assert.equal(applicants, 0);
+      assert.equal(open, undefined, 'auditions not set up yet');
+    }
+    if (stage === 'casting') {
+      assert.equal(open, true, 'auditions are open');
+      assert.equal(applicants, 28);
+      assert.ok(await n(`select count(*) from audition_reviews where production_id = '${RB_PRODUCTION}' and decision = 'pending'`) > 0, 'some still to decide');
+      assert.equal(roll, 0);
+    }
+    if (at(stage) >= at('preparation')) {
+      assert.equal(open, false, 'auditions closed');
+      assert.equal(members, 35, `${stage}: the whole company: 5 team, 5 crew, 3 band, 22 cast`);
+      assert.ok(calls > 40, `${stage}: rehearsal calendar (${calls})`);
+    }
+    if (at(stage) >= at('tech')) assert.ok(roll > 200, `${stage}: roll taken at past calls (${roll})`);
+    if (stage === 'preparation' || stage === 'tech') assert.equal(checkedIn, 0, 'no shows yet');
+    if (at(stage) >= at('wrap')) {
+      assert.ok(tickets > 1500, `${stage}: a well-sold run (${tickets})`);
+      assert.ok(checkedIn / tickets > 0.85, 'most people came');
+    }
+    assert.ok(people > 0 && members > 0);
+    // the stage-change announcements for every stage reached, and none after
+    assert.equal(await n(`select count(*) from messages where channel_id = 'rb_ch_ann' and production_stage is not null`), at(stage));
+  }
+  const after = await before();
+  assert.deepEqual(after, start, 'nobody else touched, and no alerts queued');
+  assert.equal(Number((await sys(`select count(*) n from channel_reads where person_id = 'u_owner' and channel_id like 'rb\\_%'`))[0].n) > 0, true, 'the owner has read older messages');
+  // triggers are back on: a card assigned now records who made it
+  assert.equal(Number((await sys(`select count(*) n from pg_trigger where tgname in ('check_task', 'stamp_task_update', 'check_attendance', 'push_schedule', 'push_announcement', 'push_task_assignment') and tgenabled = 'D'`))[0].n), 0);
+
+  await db.exec(rickyBobbyRemoveSql());
+  for (const table of ['people', 'productions', 'schedule_items', 'tasks', 'performances', 'performer_profiles']) {
+    const id = table === 'performer_profiles' ? 'person_id' : 'id';
+    assert.equal(Number((await sys(`select count(*) n from ${table} where ${id} like 'rb\\_%' or ${id} = '${RB_PRODUCTION}'`))[0].n), 0, `${table} cleared`);
+  }
+
+  // filling the owner's own show keeps its title, tagline, pitch and its own members
+  await sys(`insert into productions (id, title, tagline, color, opening_date, closing_date, groups) values ('p_mine', 'Ballad of Ricky Bobby', 'My tagline', '#123456', '2027-04-24T00:00:00Z', '2027-04-26T03:00:00Z', '[{"id":"g_old","name":"Leads","color":"#E8B04B"}]')`);
+  await sys(`update production_plans set stage = 'concept', pitch = 'My pitch' where production_id = 'p_mine'`);
+  await sys(`insert into memberships (production_id, person_id, group_ids, part, is_director) values ('p_mine', 'u_owner', '{g_old}', 'Director / Producer', true)`);
+  await sys(`insert into channels (id, production_id, name, kind) values ('ch_mine_ann', 'p_mine', 'Announcements', 'announcements')`);
+  const target = { id: 'p_mine', title: 'Ballad of Ricky Bobby' };
+  for (const stage of ['casting', 'performances'] as const) {
+    await db.exec(rickyBobbySql({ stage, now, target }));
+    const [show] = await sys(`select p.title, p.tagline, p.color, pl.stage, pl.pitch from productions p join production_plans pl on pl.production_id = p.id where p.id = 'p_mine'`);
+    assert.deepEqual(show, { title: 'Ballad of Ricky Bobby', tagline: 'My tagline', color: '#123456', stage, pitch: 'My pitch' });
+    const [me] = await sys(`select part, is_director, group_ids from memberships where production_id = 'p_mine' and person_id = 'u_owner'`);
+    assert.deepEqual(me, { part: 'Director / Producer', is_director: true, group_ids: ['g_rb_team'] }, 'the owner stays, on the production team');
+    assert.equal(Number((await sys(`select count(*) n from productions where id = '${RB_PRODUCTION}'`))[0].n), 0, 'no separate copy');
+    assert.ok(Number((await sys(`select count(*) n from memberships where production_id = 'p_mine'`))[0].n) > 5);
+  }
+  assert.match((await sys(`select body from messages where channel_id = 'rb_ch_ann' and body like 'Welcome%'`))[0].body, /^Welcome to the company of Ballad of Ricky Bobby!/);
+  assert.ok(Number((await sys(`select count(*) n from tickets t join performances p on p.id = t.performance_id where p.production_id = 'p_mine'`))[0].n) > 500);
+  await db.exec(rickyBobbyRemoveSql('p_mine'));
+  const [left] = await sys(`select (select stage from production_plans where production_id = 'p_mine') stage, (select count(*) from memberships where production_id = 'p_mine') members, (select count(*) from schedule_items where production_id = 'p_mine') calls, (select count(*) from performances where production_id = 'p_mine') shows, (select count(*) from people where id like 'rb\\_%') people`);
+  assert.deepEqual({ ...left, members: Number(left.members), calls: Number(left.calls), shows: Number(left.shows), people: Number(left.people) }, { stage: 'concept', members: 1, calls: 0, shows: 0, people: 0 }, 'back to just the owner, in Concept');
+  await sys(`delete from productions where id = 'p_mine'`);
 });
