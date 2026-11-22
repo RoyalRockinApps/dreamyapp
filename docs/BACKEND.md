@@ -15,7 +15,8 @@ for App Review, sessions that work in every browser, and Realtime instead of pol
 | Seeing other people's changes | **Realtime** (`postgres_changes` in `src/store/sync.ts`), a full refresh every 5 minutes, and fast re-checks on the seat picker, chat and door only while Realtime is down |
 | Email (verification, password reset) | Not yet: no email sender. "Confirm email" is off; passwords are reset by the owner in the dashboard |
 | Card payments | **Simulated.** `purchase_seats()` and `add_payment()` accept the demo card. Next: Stripe (below) |
-| Push notifications, email receipts | Not started (below) |
+| Push notifications | **Done.** `push_tokens`, `register_push_token()`, and triggers that send through Expo's push service with pg_net (`20261121000100_push_notifications.sql`). Needs an APNs key on the Expo project; Android needs FCM. Not yet: removing tokens Expo reports as `DeviceNotRegistered` |
+| Email receipts | Not started |
 
 Builds without the Supabase settings (`SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`) still run the
 on-device demo, where all state lives in the Zustand store (`src/store/useStore.ts`) persisted to
@@ -85,8 +86,9 @@ authority even when 50 people tap the same seat:
 | Request approved (with Pay button deep link `dreamtheatre://booking/<id>`) | Renter |
 | Deposit / balance received | Owner + renter |
 | Hold expiring in 12 h | Renter |
-| Call added / moved / cancelled | Called members |
-| Announcement posted | Whole company |
+| Call added / moved / cancelled | Called members (**sent**) |
+| Announcement posted, production stage changed | Whole company (**sent**) |
+| Card assigned | The assignee (**sent**) |
 | New message in a channel you're in | Channel members (respect mute) |
 | Tickets purchased (receipt + tickets) | Buyer (email) |
 

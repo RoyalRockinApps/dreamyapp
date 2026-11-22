@@ -52,23 +52,32 @@ ships to **iOS, Android** and the web.
   In Audition Review, tap a card to see the full profile, swipe right for Callback, or swipe left
   for Not a fit. The review team shares decisions, audition notes, and suggested roles.
   Performers apply from
-  Home using one reusable profile with a headshot, optional skills, and any past roles.
+  Home (visitors) or the Me page using one reusable profile with a headshot, optional skills, and any past roles.
 - **Scheduler.** Plan auditions, rehearsals, tech, performances, and strike. Set the space, groups
   called, and weekly repeats.
   It **refuses to double-book the Main Stage** and warns about cast/crew who have submitted
   conflicts for that date.
 - **RSVPs.** Each member answers Going / Maybe / Can't. Directors see the counts and who hasn't replied.
+- **Add to my calendar.** Anyone called can add a call to their phone's calendar (the phone's own
+  "new event" screen, filled in). On the website it downloads a calendar file instead.
+- **Attendance.** From half an hour before a call, directors and the owner take roll for everyone
+  called, and a group's Team Lead for the people in their groups: Present, Late, Absent or Excused.
+  The roll shows each person's RSVP or conflict. People see their own mark; directors and Team Leads
+  see each person's totals in the Company section.
 - **Conflict calendar.** Cast submit dates they can't make, and directors see them all in one place.
 - **Messaging.** Read-only Announcements, Full Company chat, an automatic chat per group,
-  and 1:1 direct messages, all with unread badges.
+  and 1:1 direct messages, all with unread badges. The **Inbox** tab gathers every chat across
+  your productions.
 
 #### Task boards
-Each production has a **Tasks** tab, and the owners and staff share a **Theatre task board** (on Home).
+Each production has a **Board** section, and the owners and staff share a **Theatre task board** (at the
+top of Productions). **Assigned to me** lists your cards from every board, and overdue or due-soon cards
+show under **Needs you** on Home.
 Cards sit in **Not started**, **In progress** or **Completed**, with notes, an assignee and a due date.
 Everyone on a board can post updates on a card, and each card shows who posted last and when.
 
 - **A production's board:** its company and the owner see it. Directors and the owner add, move and
-  delete any card. A group's **Team Leads** (set on the Company tab) do the same for that group's cards.
+  delete any card. A group's **Team Leads** (set in the Company section) do the same for that group's cards.
 - **The theatre board:** owners, staff and anyone the owner marks as a **theatre Team Lead** in
   People & access.
 
@@ -88,7 +97,7 @@ Everyone on a board can post updates on a card, and each card shows who posted l
 - Renters who buy the "Box office & ticketing" add-on get their own ticketed performances (e.g. _Nutcracker_).
 
 ### 4. Admin portal: where the owners set everything up
-`/admin` on the website (sidebar layout on desktop) or **Settings → Open admin portal** in the app:
+`/admin` on the website (sidebar layout on desktop) or **Business → Admin portal** (also on the Me page) in the app:
 
 | Section | What the owner configures |
 |---|---|
@@ -104,16 +113,33 @@ Everyone on a board can post updates on a card, and each card shows who posted l
 In the live app only people whose role is **owner** can open the portal. In the on-device demo it
 asks for the **admin PIN** (demo PIN `2020`; change it in Data & security).
 
-### 5. Customizable home screen
-Tap **Customize home** at the bottom of Home to show, hide and reorder sections and to pick up to
-four shortcuts. Each person's layout is saved separately, so owners, renters and cast each start from
-their own sensible default. **Reset to default** restores it.
+### 5. How the app is organized
+Everyone in the theatre gets the same five tabs, each showing only what their role allows:
 
-| Role | Sections available |
+| Tab | What's there |
 |---|---|
-| Owner | Shortcuts, Needs you, Coming up, Next show, This month (money), Messages, Setup progress |
-| Renter (in a company) | Book the theatre, Your bookings, On stage soon, Contact |
-| Cast & crew | Next call, Production hub, After that, Announcements, My tickets |
+| **Home** | Today: your next call with RSVP buttons, **Needs you** (booking requests, deposits, accounts to confirm, RSVPs, cards due, new announcements), the owner's numbers (next show, money this month), production updates and **Up next** |
+| **Calendar** | The owner and renters see the stage (rentals, holds, open times); everyone sees their calls, shows and cards due |
+| **Productions** | Assigned to me and the theatre task board, then each production: Overview (stage, milestones, ticket sales), Schedule, Board, Company and Chat |
+| **Inbox** | Every announcement, group chat and direct message across your productions |
+| **Business** (owner) / **Tickets** (everyone else) | Rentals, the box office, door check-in and the admin portal / shows on sale and your tickets |
+
+The profile icon (top right) opens **Me**: your performer profile, auditions, cards, tickets,
+bookings (renters in a company), alerts, and sign out. Someone outside the theatre only gets Home,
+with auditions and a link to thedreamtheatre.com.
+
+### 6. Alerts
+In the live app on a phone, Home offers alerts once and the Me page shows whether they're on. The
+database sends them through Expo's push service when:
+
+- an announcement is posted, or a production moves to a new stage (to the company),
+- a call is added, moved or cancelled (to the people called),
+- a card is assigned to someone (to that person).
+
+Nobody is alerted about their own change, and tapping an alert opens the chat, call or card.
+Delivery needs push credentials on the Expo project: an **Apple Push Notifications key** for iOS
+(`npx eas-cli@latest credentials` → iOS → Push Notifications), and Firebase (FCM) for Android, which
+isn't set up yet. Without them the app still registers, but nothing arrives.
 
 ### Three roles, one app
 In the live app each person signs in and sees their own role. In the on-device demo, use the
@@ -121,14 +147,14 @@ profile icon (top right) → **Preview the app as…** to switch personas:
 
 | Persona | Sees |
 |---|---|
-| **Theatre owner** | Dashboard, calendar, rentals pipeline, productions, box office, check-in, rates & policy settings |
+| **Theatre owner** | Today, the calendar, productions, the Inbox, and Business: rentals pipeline, box office, check-in and the admin portal |
 | **Visitor** (Jordan Ellis, a renter in no company) | Auditions, their performer profile, contact, and a link to thedreamtheatre.com for renting and tickets |
-| **Cast member** (Maya Brooks, _Jovie_ in Elf) | Their calls with RSVP, conflicts, company chat, their tickets |
+| **Cast member** (Maya Brooks, _Jovie_ in Elf, Team Lead of the Leads) | Their calls with RSVP, roll for the Leads, their cards, conflicts, the Inbox, their tickets |
 
 Demo data is seeded from the theatre's real public calendar (UAH Wind Ensemble, The Unknown Tour,
 Huntsville Ballet's _Night Songs_, Jon Reddick's NO FEAR TOUR, _Elf: The Musical_, Adonai School
 of Ballet's _Nutcracker_), plus a few sample requests. **All prices are placeholders.** The owner
-sets real rates in **Settings → Rental rates & policy**.
+sets real rates in **Admin portal → Rates & policy**.
 
 ---
 
@@ -240,21 +266,28 @@ Demo payments: card `4242 4242 4242 4242`, any future expiry. `4000 0000 0000 00
 ```
 src/
   app/                    Expo Router screens
-    (tabs)/               Home · Calendar · Rentals/Book · Shows · Tickets
+    (tabs)/               Home (Today) · Calendar · Productions · Inbox · Business (owner) or Tickets
     booking/new.tsx       booking wizard + live availability & quote
     booking/[id].tsx      booking detail, approvals, payments
     pay.tsx               deposit / balance checkout
-    production/[id].tsx   Schedule · Company · Chat · Tickets hub
+    production/[id].tsx   Overview · Schedule · Board · Company · Chat
+    attendance/[id].tsx   take roll at a call
+    my-cards.tsx          cards assigned to you, across boards
+    bookings.tsx          a renter's own bookings
     rehearsal/edit.tsx    schedule calls (repeat weekly, conflict checks)
     chat/[id].tsx         group & direct messaging
     performance/[id].tsx  seat map, holds, checkout, box office tools
     ticket/[id].tsx       QR ticket
     checkin/[id].tsx      door scanner
-    settings.tsx          sign out and delete account (live) or personas (demo), venue info
+    settings.tsx          Me: profile, auditions, cards, alerts, sign out and delete account (live) or personas (demo)
   lib/                    pure, unit-tested domain logic (no React)
     seating.ts            house layout, holds, atomic sale, orphan detection, best available
     pricing.ts            rental quotes, deposits, balances
     scheduling.ts         stage conflicts, open windows, member conflicts
+    today.ts              Home's "Needs you" list
+    attendance.ts         who takes roll, and each person's record
+    ics.ts                calendar files for "Add to my calendar" on the website
+    push.ts               alerts: permission, this phone's push token, opening a tapped alert
     payments.ts           card validation + PaymentProvider interface (demo provider)
     seed.ts               demo data
     backend.ts            Supabase URL + key from app.config.js; LIVE is true when the build has them
