@@ -9,7 +9,7 @@ export default function TheatreTasks() {
   if (!canSeeBoard(user)) return <Empty icon="lock-closed-outline" title="This board isn’t available to you" />;
   return (
     <Screen>
-      <Txt v="small">Venue work for the owner, staff and theatre Team Leads. Each show has its own board under Shows.</Txt>
+      <Txt v="small">Venue work for the owner, staff and theatre Team Leads. Each production has its own board in its Board section.</Txt>
       <TaskBoard />
     </Screen>
   );

@@ -1,15 +1,18 @@
-import { dayKey } from './dates';
+import { atMinutes, dayKey } from './dates';
+import { canManageProduction } from './production';
 import { bookingBlocksStage, isCalled } from './scheduling';
-import type { Booking, Performance, Production, ScheduleItem, User } from './types';
+import type { Booking, Performance, Production, ScheduleItem, Task, User } from './types';
 
 export interface AgendaItem {
   id: string;
-  kind: 'rental' | 'tentative' | 'rehearsal' | 'performance' | 'unavailable';
+  kind: 'rental' | 'tentative' | 'rehearsal' | 'performance' | 'unavailable' | 'task';
   title: string;
   subtitle?: string;
   start: string;
   end: string;
   href?: string;
+  /** a whole day, like a card's due date, rather than a time */
+  allDay?: boolean;
 }
 
 interface Input {
@@ -17,12 +20,14 @@ interface Input {
   schedule: ScheduleItem[];
   productions: Production[];
   performances: Performance[];
+  /** cards assigned to this viewer appear on their due dates */
+  tasks?: Task[];
   user: User;
   now?: Date;
 }
 
 /** Everything happening at the venue, filtered to what this viewer is allowed to see. */
-export function buildAgenda({ bookings, schedule, productions, performances, user, now = new Date() }: Input): AgendaItem[] {
+export function buildAgenda({ bookings, schedule, productions, performances, tasks = [], user, now = new Date() }: Input): AgendaItem[] {
   const out: AgendaItem[] = [];
   const isOwner = user.role === 'owner';
 
@@ -47,7 +52,8 @@ export function buildAgenda({ bookings, schedule, productions, performances, use
   for (const s of schedule) {
     const prod = productions.find((p) => p.id === s.productionId);
     if (!prod) continue;
-    if (isOwner || (user.role === 'member' && isCalled(s, prod, user.id))) {
+    // the owner sees every call; anyone else sees the calls they're on, and a director sees all of their show's
+    if (isOwner || canManageProduction(prod, user) || isCalled(s, prod, user.id)) {
       out.push({ id: s.id, kind: 'rehearsal', title: `${s.title}`, subtitle: `${prod.title} · ${s.space}`, start: s.start, end: s.end, href: `/production/${prod.id}?tab=schedule&item=${s.id}` });
     } else if (user.role === 'renter' && s.space === 'Main Stage') {
       out.push({ id: s.id, kind: 'unavailable', title: 'Reserved', start: s.start, end: s.end });
@@ -57,6 +63,21 @@ export function buildAgenda({ bookings, schedule, productions, performances, use
   for (const p of performances) {
     const end = new Date(new Date(p.start).getTime() + 2.5 * 3600000).toISOString();
     out.push({ id: p.id, kind: 'performance', title: p.title, subtitle: p.subtitle ?? 'Performance', start: p.start, end, href: `/performance/${p.id}` });
+  }
+
+  for (const t of tasks) {
+    if (t.assigneeId !== user.id || !t.dueDate || t.status === 'completed') continue;
+    const prod = productions.find((p) => p.id === t.productionId);
+    out.push({
+      id: t.id,
+      kind: 'task',
+      title: t.title,
+      subtitle: `Card due · ${prod?.title ?? 'Theatre board'}`,
+      start: atMinutes(t.dueDate, 0).toISOString(),
+      end: atMinutes(t.dueDate, 23 * 60 + 59).toISOString(),
+      href: `/task/${t.id}`,
+      allDay: true,
+    });
   }
 
   return out.sort((a, b) => a.start.localeCompare(b.start));

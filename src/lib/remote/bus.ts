@@ -15,14 +15,14 @@ export type BaseSlice =
   | 'performances'
   | 'orders'
   | 'tickets'
-  | 'layouts'
   | 'links'
-  | 'tasks';
+  | 'tasks'
+  | 'attendance';
 export type Slice = BaseSlice | `seats:${string}`;
 
 export const ALL_SLICES: BaseSlice[] = [
   'config', 'people', 'bookings', 'productions', 'schedule', 'conflicts', 'channels', 'messages', 'reads',
-  'performances', 'orders', 'tickets', 'layouts', 'links', 'tasks',
+  'performances', 'orders', 'tickets', 'links', 'tasks', 'attendance',
 ];
 
 type Loader = (slices: Slice[]) => Promise<void>;

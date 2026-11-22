@@ -33,7 +33,13 @@ export default function CalendarScreen() {
   const dayItems = byDay[selected] ?? [];
   const windows = useMemo(() => openWindows(selected, stageBusy(bookings, schedule), bufferMins), [selected, bookings, schedule, bufferMins]);
   const isPast = selected < dayKey(today);
-  const kinds = isOwner ? (['rental', 'tentative', 'rehearsal', 'performance'] as const) : (['rental', 'tentative', 'unavailable', 'performance'] as const);
+  // the owner and renters book the stage; everyone else sees their own calls, shows and due cards
+  const canBook = isOwner || user.role === 'renter';
+  const kinds = isOwner
+    ? (['rental', 'tentative', 'rehearsal', 'performance', 'task'] as const)
+    : canBook
+      ? (['rental', 'tentative', 'unavailable', 'rehearsal', 'performance', 'task'] as const)
+      : (['rehearsal', 'performance', 'task'] as const);
 
   return (
     <Screen>
@@ -52,12 +58,12 @@ export default function CalendarScreen() {
       </Row>
 
       <SectionHeader title={fmtDate(atMinutes(selected, 0), { weekday: true, year: true })} />
-      {dayItems.length === 0 && <Txt v="muted">Nothing on the books — the stage is open.</Txt>}
+      {dayItems.length === 0 && <Txt v="muted">{canBook ? 'Nothing on the books — the stage is open.' : 'Nothing on your calendar this day.'}</Txt>}
       {dayItems.map((it) => (
         <AgendaRow key={it.id} item={it} showDate={false} />
       ))}
 
-      {!isPast && (
+      {!isPast && canBook && (
         <Card>
           <Txt v="label">Stage availability</Txt>
           {windows.length === 0 ? (

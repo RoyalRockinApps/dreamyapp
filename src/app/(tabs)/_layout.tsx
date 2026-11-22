@@ -5,7 +5,8 @@ import type { ColorValue } from 'react-native';
 
 import { HeaderBackdrop, IconButton, type IconName } from '@/components/ui';
 import { Wordmark } from '@/components/Wordmark';
-import { useCurrentUser, useIsAffiliated, useStore } from '@/store/useStore';
+import { useChannels } from '@/hooks/useChannels';
+import { useCurrentUser, useIsAffiliated } from '@/store/useStore';
 import { C, F } from '@/theme';
 
 function icon(name: IconName) {
@@ -15,18 +16,16 @@ function icon(name: IconName) {
   return TabIcon;
 }
 
+/**
+ * The same five tabs for everyone in the theatre: Home, Calendar, Productions and Inbox, then
+ * Business for the owner (rentals, box office, admin) or Tickets for everyone else. Someone
+ * outside the theatre only gets Home (auditions and a link to thedreamtheatre.com).
+ */
 export default function TabsLayout() {
   const user = useCurrentUser();
-  const role = user.role;
-  const inCompany = useStore((s) => s.productions.some((p) => p.members.some((m) => m.userId === user.id)));
-  // Someone outside the theatre only gets Home (auditions and a link to thedreamtheatre.com).
+  const isOwner = user.role === 'owner';
   const affiliated = useIsAffiliated();
-  // Each role sees the parts of the app that matter to them.
-  const show = {
-    calendar: role !== 'member',
-    rentals: role !== 'member',
-    shows: role !== 'renter' || inCompany,
-  };
+  const unread = useChannels().reduce((n, c) => n + c.unread, 0);
 
   return (
     <Tabs
@@ -41,19 +40,18 @@ export default function TabsLayout() {
         tabBarActiveTintColor: C.accent,
         tabBarInactiveTintColor: C.faint,
         tabBarLabelStyle: { fontFamily: F.semibold, letterSpacing: 0.3 },
+        tabBarBadgeStyle: { backgroundColor: C.accent, color: C.bg, fontFamily: F.bold },
         sceneStyle: { backgroundColor: C.bg },
         headerRight: () => <IconButton icon="person-circle-outline" color={C.accent} size={26} onPress={() => router.push('/settings')} />,
         headerRightContainerStyle: { paddingRight: 16 },
       }}>
       <Tabs.Screen name="index" options={{ title: 'Home', headerTitle: () => <Wordmark width={170} />, tabBarIcon: icon('home') }} />
       <Tabs.Protected guard={affiliated}>
-        <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: icon('calendar'), href: show.calendar ? undefined : null }} />
-        <Tabs.Screen
-          name="rentals"
-          options={{ title: role === 'owner' ? 'Rentals' : 'Book', headerTitle: role === 'owner' ? 'Rentals' : 'Rent the Theatre', tabBarIcon: icon('key'), href: show.rentals ? undefined : null }}
-        />
-        <Tabs.Screen name="shows" options={{ title: role === 'owner' ? 'Shows' : 'My Shows', tabBarIcon: icon('people'), href: show.shows ? undefined : null }} />
-        <Tabs.Screen name="tickets" options={{ title: 'Tickets', tabBarIcon: icon('ticket') }} />
+        <Tabs.Screen name="calendar" options={{ title: 'Calendar', tabBarIcon: icon('calendar') }} />
+        <Tabs.Screen name="productions" options={{ title: 'Productions', tabBarIcon: icon('people') }} />
+        <Tabs.Screen name="inbox" options={{ title: 'Inbox', tabBarIcon: icon('chatbubbles'), tabBarBadge: unread ? (unread > 9 ? '9+' : unread) : undefined }} />
+        <Tabs.Screen name="business" options={{ title: 'Business', tabBarIcon: icon('briefcase'), href: isOwner ? undefined : null }} />
+        <Tabs.Screen name="tickets" options={{ title: 'Tickets', tabBarIcon: icon('ticket'), href: isOwner ? null : undefined }} />
       </Tabs.Protected>
     </Tabs>
   );

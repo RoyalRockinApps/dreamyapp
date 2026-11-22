@@ -33,8 +33,8 @@ export default function AdminShows() {
         <PerformanceEditor key={p.id} p={p} />
       ))}
       <SectionHeader title="Productions" />
-      <Txt v="small">Cast, crew, rehearsals and group chats are managed in the app’s Shows tab — it works the same here on the website.</Txt>
-      <Button variant="secondary" icon="people" title="Open Shows" onPress={() => router.navigate('/shows')} />
+      <Txt v="small">Cast, crew, rehearsals and group chats are managed in the app’s Productions tab — it works the same here on the website.</Txt>
+      <Button variant="secondary" icon="people" title="Open Productions" onPress={() => router.navigate('/productions')} />
     </AdminPage>
   );
 }

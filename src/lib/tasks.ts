@@ -1,6 +1,6 @@
 // Task boards: who sees and manages which board, mirroring the database rules in
 // supabase/migrations/20261119000100_task_boards.sql.
-import { timeAgo } from './dates';
+import { dayKey, timeAgo } from './dates';
 import { canManageProduction } from './production';
 import type { Group, Production, Task, TaskStatus, TaskUpdate, User } from './types';
 
@@ -63,4 +63,21 @@ export function updatesByTask(updates: TaskUpdate[]): Map<string, { last: TaskUp
 export function agoLabel(iso: string, now = new Date()): string {
   const t = timeAgo(iso, now);
   return t === 'now' ? 'just now' : /^\d+[mhd]$/.test(t) ? `${t} ago` : t;
+}
+
+/** Cards assigned to this person, open ones first (soonest due), then completed (newest first). */
+export function assignedTo(tasks: Task[], userId: string): { open: Task[]; completed: Task[] } {
+  const mine = tasks.filter((t) => t.assigneeId === userId);
+  return {
+    open: sortTasks(mine.filter((t) => t.status !== 'completed')),
+    completed: mine.filter((t) => t.status === 'completed').sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
+  };
+}
+
+/** Is this open card overdue, or due within `days` days of `today` (both YYYY-MM-DD)? */
+export function dueState(task: Task, today: string, days = 3): 'overdue' | 'soon' | undefined {
+  if (task.status === 'completed' || !task.dueDate) return undefined;
+  if (task.dueDate < today) return 'overdue';
+  const [y, m, d] = today.split('-').map(Number);
+  return task.dueDate <= dayKey(new Date(y, m - 1, d + days)) ? 'soon' : undefined;
 }

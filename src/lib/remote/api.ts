@@ -2,7 +2,6 @@
 // Reads and live updates live in src/store/sync.ts.
 
 import { auditionSummary } from '../auditions';
-import type { HomeLayout } from '../home';
 import type { HouseConfig } from '../seating';
 import type {
   AuditionApplication,
@@ -29,6 +28,7 @@ import type {
   ProductionBrief,
   ProductionMilestone,
   ProductionStage,
+  AttendanceStatus,
   RentalSettings,
   Rsvp,
   ScheduleItem,
@@ -70,12 +70,6 @@ export function updateConfig(patch: { venue?: VenueInfo; settings?: RentalSettin
 export const insertPerson = (u: User) => run(db().from('people').insert(R.fromUser(u)));
 export const updatePerson = (id: string, patch: Partial<Omit<User, 'id'>>) => run(db().from('people').update(omitId(R.fromUser({ ...patch, id }))).eq('id', id));
 export const deletePerson = (id: string) => run(db().from('people').delete().eq('id', id));
-
-export function saveHomeLayout(personId: string, layout: HomeLayout | null) {
-  return layout
-    ? run(db().from('home_layouts').upsert({ person_id: personId, layout }))
-    : run(db().from('home_layouts').delete().eq('person_id', personId));
-}
 
 // ---------- rentals ----------
 
@@ -324,3 +318,19 @@ export const insertTaskUpdate = (u: Pick<TaskUpdate, 'id' | 'taskId' | 'body'>) 
   run(db().from('task_updates').insert({ id: u.id, task_id: u.taskId, body: u.body, author_name: '' }));
 
 export const deleteTaskUpdate = (id: string) => run(db().from('task_updates').delete().eq('id', id).select('id').single());
+
+// ---------- attendance ----------
+
+/** Mark someone at a call (who marked it, and when, come from the server), or clear their mark. */
+export function setAttendance(itemId: string, personId: string, mark: { status: AttendanceStatus; note: string } | null) {
+  return mark
+    ? run(db().from('attendance').upsert({ item_id: itemId, person_id: personId, status: mark.status, note: mark.note }))
+    : run(db().from('attendance').delete().eq('item_id', itemId).eq('person_id', personId));
+}
+
+// ---------- push notifications ----------
+
+/** This phone gets the signed-in person's alerts. */
+export const registerPushToken = (token: string, platform: 'ios' | 'android') => rpc('register_push_token', { p_token: token, p_platform: platform });
+/** This phone stops getting alerts (on sign-out). */
+export const unregisterPushToken = (token: string) => rpc('unregister_push_token', { p_token: token });

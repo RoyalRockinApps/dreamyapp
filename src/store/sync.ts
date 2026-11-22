@@ -10,6 +10,7 @@ import { AppState as RNAppState } from 'react-native';
 import { create } from 'zustand';
 
 import { LIVE } from '@/lib/backend';
+import { stopPush } from '@/lib/push';
 import * as api from '@/lib/remote/api';
 import * as auth from '@/lib/remote/auth';
 import { ALL_SLICES, setRefreshLoader, type BaseSlice, type Slice } from '@/lib/remote/bus';
@@ -87,12 +88,9 @@ const loaders: Record<BaseSlice, () => Promise<Patch>> = {
   },
   orders: async () => ({ orders: (await rows<R.OrderRow>('orders', ['at', 'id'])).map(R.toOrder) }),
   tickets: async () => ({ tickets: (await rows<R.TicketRow>('tickets', ['id'])).map(R.toTicket) }),
-  layouts: async () => {
-    const out: AppState['homeLayouts'] = {};
-    for (const r of await rows<R.HomeLayoutRow>('home_layouts', ['person_id'])) out[r.person_id] = r.layout;
-    return { homeLayouts: out };
-  },
   // only the boards this person can see (row-level security)
+  // only what this person may see: their own marks, or their production's if they direct or lead a group
+  attendance: async () => ({ attendance: (await rows<R.AttendanceRow>('attendance', ['item_id', 'person_id'])).map(R.toAttendance) }),
   tasks: async () => {
     const [t, u] = await Promise.all([rows<R.TaskRow>('tasks', ['created_at', 'id']), rows<R.TaskUpdateRow>('task_updates', ['at', 'id'])]);
     return { tasks: t.map(R.toTask), taskUpdates: u.map(R.toTaskUpdate) };
@@ -159,7 +157,7 @@ const TABLE_SLICES: Record<string, Slice[]> = {
   productions: ['productions'],
   production_plans: ['productions'],
   production_milestones: ['productions'],
-  memberships: ['productions', 'people', 'schedule', 'conflicts', 'channels', 'messages', 'tasks'],
+  memberships: ['productions', 'people', 'schedule', 'conflicts', 'channels', 'messages', 'tasks', 'attendance'],
   schedule_items: ['schedule'],
   rsvps: ['schedule'],
   member_conflicts: ['conflicts'],
@@ -171,6 +169,7 @@ const TABLE_SLICES: Record<string, Slice[]> = {
   link_requests: ['links'],
   tasks: ['tasks'],
   task_updates: ['tasks'],
+  attendance: ['attendance'],
 };
 
 let channel: RealtimeChannel | null = null;
@@ -285,5 +284,6 @@ export async function retryLive() {
 }
 
 export async function signOut() {
+  await stopPush(); // this phone stops getting the person's alerts
   await auth.signOut();
 }

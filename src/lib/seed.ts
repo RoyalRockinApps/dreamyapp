@@ -1,8 +1,10 @@
 import { addDays, dayKey, localIso, startOfDay } from './dates';
 import { ticketCode } from './ids';
 import { quoteRental } from './pricing';
+import { rollIds } from './attendance';
 import { buildLayout, orderTotals, priceFor } from './seating';
 import type {
+  Attendance,
   Booking,
   Channel,
   MemberConflict,
@@ -94,6 +96,7 @@ export interface SeedData {
   tickets: Ticket[];
   tasks: Task[];
   taskUpdates: TaskUpdate[];
+  attendance: Attendance[];
 }
 
 export function buildSeed(now: Date = new Date()): SeedData {
@@ -367,12 +370,26 @@ export function buildSeed(now: Date = new Date()): SeedData {
     update('tu_5', 'task_aisle', OWNER_ID, 'Electrician booked for Tuesday morning.', 5),
   ];
 
+  // Roll at past calls: mostly present, a few late, the odd absence, and anyone with a conflict that day excused.
+  const rollRand = mulberry32(11);
+  const attendance: Attendance[] = [];
+  for (const s of schedule) {
+    if (new Date(s.end) >= now) continue;
+    for (const id of rollIds(s, elf)) {
+      const excused = conflicts.some((c) => c.userId === id && c.start < s.end && c.end > s.start);
+      const r = rollRand();
+      const status = excused ? 'excused' : r < 0.86 ? 'present' : r < 0.95 ? 'late' : 'absent';
+      attendance.push({ itemId: s.id, userId: id, status, note: excused ? 'Conflict on file' : '', markedBy: 'u_ben', markedAt: s.start });
+    }
+  }
+
   return {
     users,
     bookings,
     productions: [elf],
     tasks,
     taskUpdates,
+    attendance,
     schedule,
     conflicts,
     channels,

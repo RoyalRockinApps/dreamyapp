@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { Linking, View } from 'react-native';
 
 import { alert } from '@/components/alert';
+import { NotificationsRow } from '@/components/PushSettings';
 import { Avatar, Button, Card, ListItem, Pill, Row, Screen, SectionHeader, Txt } from '@/components/ui';
 import { APK_URL, WEB_URL } from '@/lib/links';
 import { MEMBER_ID, OWNER_ID, RENTER_ID } from '@/lib/seed';
@@ -13,10 +14,10 @@ import { C } from '@/theme';
 const PERSONAS = [
   { id: OWNER_ID, label: 'Theatre owner', desc: 'Everything: rentals, deposits, productions, box office, check-in.' },
   { id: RENTER_ID, label: 'Visitor', desc: 'Not in a company: applies for auditions here, and rents or buys tickets at thedreamtheatre.com.' },
-  { id: MEMBER_ID, label: 'Cast member', desc: 'Sees their calls, RSVPs, submits conflicts and chats with the company.' },
+  { id: MEMBER_ID, label: 'Cast member', desc: 'Their calls and RSVPs, roll for the Leads (she’s their Team Lead), her cards, conflicts and company chat.' },
 ];
 
-export default function Settings() {
+export default function Me() {
   const user = useCurrentUser();
   const deleteMyAccount = useStore((st) => st.deleteMyAccount);
   const users = useStore((s) => s.users);
@@ -25,6 +26,8 @@ export default function Settings() {
   const venue = useStore((s) => s.venue);
   const isOwner = user.role === 'owner';
   const affiliated = useIsAffiliated();
+  const myCards = useStore((s) => s.tasks.filter((t) => t.assigneeId === user.id && t.status !== 'completed').length);
+  const myBookings = useStore((s) => s.bookings.filter((b) => b.renterId === user.id).length);
 
   return (
     <Screen>
@@ -40,7 +43,15 @@ export default function Settings() {
         </Row>
       </Card>
 
-      <Button variant="secondary" icon="person-outline" title="My performer profile" onPress={() => router.push('/performer-profile')} />
+      <Card style={{ paddingVertical: 4 }}>
+        <ListItem icon="person-outline" title="My performer profile" subtitle="Your photo, résumé and skills for auditions" onPress={() => router.push('/performer-profile')} />
+        <ListItem icon="mic-outline" title="Auditions" subtitle="Open auditions and your applications" onPress={() => router.push('/auditions')} />
+        {affiliated && <ListItem icon="albums-outline" title="Assigned to me" subtitle={myCards ? `${myCards} open card${myCards === 1 ? '' : 's'}` : 'Cards assigned to you'} onPress={() => router.push('/my-cards')} />}
+        {affiliated && !isOwner && <ListItem icon="ticket-outline" title="My tickets" subtitle="Shows on sale and seats you’ve bought" onPress={() => router.navigate('/tickets')} />}
+        {affiliated && !isOwner && (user.role === 'renter' || myBookings > 0) && <ListItem icon="key-outline" title="My bookings" subtitle="Rent the theatre and see your reservations" onPress={() => router.push('/bookings')} />}
+        {affiliated && <NotificationsRow />}
+        {isOwner && <ListItem icon="settings-outline" title="Admin portal" subtitle="Venue, rates, seating, people and backups" onPress={() => router.push('/admin')} />}
+      </Card>
 
       {LIVE && (
         <Button
@@ -103,20 +114,11 @@ export default function Settings() {
         );
       })}
 
-      {affiliated && <SectionHeader title="Admin portal" />}
-      {affiliated && <Card accent={C.accent}>
-        <Txt v="h3">Set everything up</Txt>
-        <Txt v="small">Venue profile, rental rates & deposits, packages, seating chart, ticket prices, people and backups — on your phone or at the website.</Txt>
-        <Button icon="settings" title={isOwner ? 'Open admin portal' : 'Owner sign-in'} onPress={() => router.push('/admin')} />
-      </Card>}
       {affiliated && !!(APK_URL || WEB_URL) && (
-        <>
-          <SectionHeader title="Get the app" />
-          <Card>
-            {APK_URL ? <ListItem icon="logo-android" iconColor={C.green} title="Download the Android app (APK)" subtitle="Latest build from the pipeline" onPress={() => Linking.openURL(APK_URL)} /> : null}
-            {WEB_URL ? <ListItem icon="globe-outline" iconColor={C.blue} title="Open the website" subtitle={WEB_URL} onPress={() => Linking.openURL(WEB_URL)} /> : null}
-          </Card>
-        </>
+        <Card style={{ paddingVertical: 4 }}>
+          {APK_URL ? <ListItem icon="logo-android" iconColor={C.green} title="Get the Android app" subtitle="Latest build from the pipeline" onPress={() => Linking.openURL(APK_URL)} /> : null}
+          {WEB_URL ? <ListItem icon="globe-outline" iconColor={C.blue} title="Open the website" subtitle={WEB_URL} onPress={() => Linking.openURL(WEB_URL)} /> : null}
+        </Card>
       )}
 
       {!LIVE && <SectionHeader title="Demo data" />}
