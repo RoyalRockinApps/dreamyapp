@@ -306,6 +306,19 @@ export const SPACES: Space[] = ['Main Stage', 'Rehearsal Room', 'Lobby', 'Dressi
 
 export type Rsvp = 'yes' | 'no' | 'maybe';
 
+export const ATTENDANCE_STATUSES = ['present', 'late', 'absent', 'excused'] as const;
+export type AttendanceStatus = (typeof ATTENDANCE_STATUSES)[number];
+
+/** One person's mark at one call. */
+export interface Attendance {
+  itemId: string;
+  userId: string;
+  status: AttendanceStatus;
+  note: string;
+  markedBy?: string;
+  markedAt: string;
+}
+
 export interface ScheduleItem {
   id: string;
   productionId: string;

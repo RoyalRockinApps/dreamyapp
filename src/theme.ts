@@ -1,4 +1,4 @@
-import type { BookingStatus } from '@/lib/types';
+import type { AttendanceStatus, BookingStatus } from '@/lib/types';
 
 // A private screening room on thedreamtheatre.com's black stage. The website gives the black,
 // the off-white type, the square-ish buttons and the typefaces: Adamina headings in letter-spaced
@@ -62,6 +62,13 @@ export const SP = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 };
 
 /** The glow of a lit LED line. */
 export const GLOW = `0 0 10px ${C.glow}`;
+
+export const ATTENDANCE_COLOR: Record<AttendanceStatus, string> = {
+  present: C.green,
+  late: C.warn,
+  absent: C.danger,
+  excused: C.blue,
+};
 
 export const STATUS_META: Record<BookingStatus, { label: string; color: string; bg: string }> = {
   inquiry: { label: 'New request', color: C.blue, bg: C.blueSoft },

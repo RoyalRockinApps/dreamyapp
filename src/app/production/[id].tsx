@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { AddToCalendar } from '@/components/AddToCalendar';
+import { ATTENDANCE_LABELS, attendanceCounts, canTakeAttendance, countsLabel, rollOpen, takesRoll } from '@/lib/attendance';
 import { ChannelRow } from '@/components/ChannelList';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { ProductionAuditions } from '@/components/ProductionAuditions';
@@ -19,7 +20,7 @@ import { calledMemberIds, isCalled, memberConflictsFor } from '@/lib/scheduling'
 import { salesSummary } from '@/lib/seating';
 import type { MemberConflict, Production, Rsvp, ScheduleItem } from '@/lib/types';
 import { errorMessage, useCurrentUser, useStore } from '@/store/useStore';
-import { C } from '@/theme';
+import { ATTENDANCE_COLOR, C } from '@/theme';
 import { alert } from '@/components/alert';
 
 type Tab = 'overview' | 'schedule' | 'board' | 'company' | 'chat';
@@ -133,6 +134,12 @@ function ScheduleCard({ item, p, canEdit, highlighted }: { item: ScheduleItem; p
     else counts.none++;
   }
   const clashes = memberConflictsFor(item, p, conflicts);
+  const attendance = useStore((s) => s.attendance);
+  const myMark = attendance.find((a) => a.itemId === item.id && a.userId === user.id);
+  const rollers = takesRoll(user, p);
+  const rollIds = rollers ? called.filter((id) => canTakeAttendance(user, p, id)) : [];
+  const rollCount = rollIds.length;
+  const rollMarked = rollIds.filter((id) => attendance.some((a) => a.itemId === item.id && a.userId === id)).length;
   const groups = item.groupIds.length ? item.groupIds.map((g) => p.groups.find((x) => x.id === g)).filter(Boolean) : null;
   const isPast = new Date(item.end) < new Date();
   const kindColor = ['Tech', 'Dress', 'Performance', 'Strike'].includes(item.kind) ? C.curtain : item.kind === 'Call Time' ? C.gold : C.purple;
@@ -159,6 +166,16 @@ function ScheduleCard({ item, p, canEdit, highlighted }: { item: ScheduleItem; p
         </Row>
       )}
       {amCalled && !isPast && open && <AddToCalendar item={item} production={p} />}
+      {myMark && <Txt v="small" color={ATTENDANCE_COLOR[myMark.status]}>{`You were marked ${ATTENDANCE_LABELS[myMark.status].toLowerCase()}${myMark.note ? ` · ${myMark.note}` : ''}`}</Txt>}
+      {rollers && rollOpen(item) && (
+        <Button
+          small
+          variant="secondary"
+          icon="clipboard-outline"
+          title={rollMarked ? `Attendance · ${rollMarked}/${rollCount} marked` : 'Take attendance'}
+          onPress={() => router.push(`/attendance/${item.id}`)}
+        />
+      )}
 
       {open && canEdit && (
         <View style={{ gap: 4, marginTop: 4 }}>
@@ -236,6 +253,9 @@ function CompanyTab({ p }: { p: Production }) {
   const isOwner = user.role === 'owner';
   const canManage = canManageProduction(p, user);
   const users = useStore((s) => s.users);
+  const attendance = useStore((s) => s.attendance);
+  const schedule = useStore((s) => s.schedule);
+  const itemIds = useMemo(() => new Set(schedule.filter((x) => x.productionId === p.id).map((x) => x.id)), [schedule, p.id]);
   const addMember = useStore((s) => s.addMember);
   const addGroup = useStore((s) => s.addGroup);
   const updateCompanyMember = useStore((s) => s.updateCompanyMember);
@@ -340,6 +360,9 @@ function CompanyTab({ p }: { p: Production }) {
                       <Txt v="h3">{u.name + (u.id === user.id ? ' (you)' : '')}</Txt>
                       {m.part ? <Txt v="small">{m.part}</Txt> : null}
                       {!!m.leadGroupIds?.length && <Txt v="small">{`Team Lead · ${m.leadGroupIds.map((id) => groupLabels[id]).filter(Boolean).join(', ')}`}</Txt>}
+                      {(u.id === user.id || canTakeAttendance(user, p, u.id)) && countsLabel(attendanceCounts(attendance, u.id, itemIds)) ? (
+                        <Txt v="small" color={C.muted}>{`Attendance: ${countsLabel(attendanceCounts(attendance, u.id, itemIds))}`}</Txt>
+                      ) : null}
                       {m.canReviewAuditions && !m.isDirector && <Txt v="small">Audition reviewer</Txt>}
                       {m.canPlanConcept && !m.isDirector && (canManage || u.id === user.id) && <Txt v="small">Concept planner</Txt>}
                     </View>
@@ -353,7 +376,7 @@ function CompanyTab({ p }: { p: Production }) {
                       {memberGroups.length > 0 && (
                         <>
                           <Txt v="label">Team Lead of</Txt>
-                          <Txt v="small">Team Leads add, move and update their group’s cards on the Tasks board.</Txt>
+                          <Txt v="small">Team Leads manage their group’s cards on the Board and take roll for their group at calls.</Txt>
                           <Chips multi options={memberGroups} value={memberLeads.filter((id) => memberGroups.includes(id))} onChange={(id) => setMemberLeads(toggle(memberLeads, id))} labels={groupLabels} colors={groupColors} />
                         </>
                       )}

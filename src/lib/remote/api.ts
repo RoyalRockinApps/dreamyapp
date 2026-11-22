@@ -28,6 +28,7 @@ import type {
   ProductionBrief,
   ProductionMilestone,
   ProductionStage,
+  AttendanceStatus,
   RentalSettings,
   Rsvp,
   ScheduleItem,
@@ -317,3 +318,12 @@ export const insertTaskUpdate = (u: Pick<TaskUpdate, 'id' | 'taskId' | 'body'>) 
   run(db().from('task_updates').insert({ id: u.id, task_id: u.taskId, body: u.body, author_name: '' }));
 
 export const deleteTaskUpdate = (id: string) => run(db().from('task_updates').delete().eq('id', id).select('id').single());
+
+// ---------- attendance ----------
+
+/** Mark someone at a call (who marked it, and when, come from the server), or clear their mark. */
+export function setAttendance(itemId: string, personId: string, mark: { status: AttendanceStatus; note: string } | null) {
+  return mark
+    ? run(db().from('attendance').upsert({ item_id: itemId, person_id: personId, status: mark.status, note: mark.note }))
+    : run(db().from('attendance').delete().eq('item_id', itemId).eq('person_id', personId));
+}

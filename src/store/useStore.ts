@@ -9,6 +9,7 @@ import { uid, ticketCode } from '@/lib/ids';
 import { quoteRental } from '@/lib/pricing';
 import { canManageProduction, canPlanProduction, canReviewAudition, isAffiliated, productionStage, STAGE_LABELS } from '@/lib/production';
 import { canManageTask, canSeeBoard } from '@/lib/tasks';
+import { canTakeAttendance } from '@/lib/attendance';
 import * as api from '@/lib/remote/api';
 import { refresh, type Slice } from '@/lib/remote/bus';
 import { unavailableSeats } from '@/lib/remote/rows';
@@ -16,6 +17,8 @@ import { claimsOutside, commitSale, configureHouse, DEFAULT_HOUSE, holdSeats, or
 import { buildSeed, DEFAULT_SETTINGS, OWNER_ID, VENUE } from '@/lib/seed';
 import { LIVE } from '@/lib/backend';
 import type {
+  Attendance,
+  AttendanceStatus,
   AuditionApplicant,
   AuditionApplication,
   AuditionDecision,
@@ -123,6 +126,9 @@ export interface AppState {
   upsertScheduleItem(item: Omit<ScheduleItem, 'id' | 'rsvps'> & { id?: string }): ScheduleItem;
   deleteScheduleItem(id: string): void;
   rsvp(itemId: string, userId: string, r: Rsvp): void;
+  // rehearsal attendance: a director, the owner or the person's Team Lead marks them at a call
+  attendance: Attendance[];
+  markAttendance(itemId: string, userId: string, status: AttendanceStatus | null, note?: string): void;
   addConflict(c: Omit<MemberConflict, 'id'>): void;
   removeConflict(id: string): void;
   addMember(productionId: string, user: Omit<User, 'id' | 'color' | 'role'>, groupIds: string[], part?: string): Promise<void>;
@@ -208,6 +214,7 @@ export function emptyState(): Data {
     linkRequests: [],
     tasks: [],
     taskUpdates: [],
+    attendance: [],
     users: [],
     bookings: [],
     productions: [],
@@ -714,6 +721,21 @@ export const useStore = create<AppState>()(
           set((s) => ({ schedule: s.schedule.map((x) => (x.id === itemId ? { ...x, rsvps: { ...x.rsvps, [userId]: r } } : x)) }));
           push('your RSVP', ['schedule'], () => api.setRsvp(itemId, userId, r));
         },
+        markAttendance: (itemId, userId, status, note = '') => {
+          const { schedule, productions, users } = get();
+          const item = schedule.find((x) => x.id === itemId);
+          const production = item && productions.find((p) => p.id === item.productionId);
+          const user = users.find((u) => u.id === me());
+          if (!item || !production || !user || !canTakeAttendance(user, production, userId)) {
+            alert('Can’t mark attendance', 'Only a director, the owner or that person’s Team Lead can take roll for them.');
+            return;
+          }
+          set((s) => {
+            const rest = s.attendance.filter((a) => !(a.itemId === itemId && a.userId === userId));
+            return { attendance: status ? [...rest, { itemId, userId, status, note, markedBy: user.id, markedAt: new Date().toISOString() }] : rest };
+          });
+          push('the attendance', ['attendance'], () => api.setAttendance(itemId, userId, status ? { status, note } : null));
+        },
         addConflict: (c) => {
           const conflict = { ...c, id: uid('c_') };
           set((s) => ({ conflicts: [...s.conflicts, conflict] }));
@@ -946,7 +968,7 @@ const DATA_KEYS = [
   'currentUserId', 'venue', 'settings', 'users', 'bookings', 'productions', 'schedule', 'conflicts',
   'channels', 'messages', 'lastRead', 'performances', 'orders', 'tickets', 'house', 'adminPin', 'setup',
   'productionConcepts', 'performerProfiles', 'productionAuditions', 'auditionEntries', 'linkRequests',
-  'tasks', 'taskUpdates',
+  'tasks', 'taskUpdates', 'attendance',
 ] as const;
 
 function pickData(s: AppState): Data {

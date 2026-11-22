@@ -2,6 +2,8 @@
 
 import type { HouseConfig } from '../seating';
 import type {
+  Attendance,
+  AttendanceStatus,
   Booking,
   Channel,
   LinkRequest,
@@ -637,4 +639,17 @@ export function fromTask(t: Partial<Task>): Partial<TaskRow> {
 
 export const toTaskUpdate = (r: TaskUpdateRow): TaskUpdate => ({
   id: r.id, taskId: r.task_id, ...(r.person_id ? { personId: r.person_id } : {}), authorName: r.author_name, body: r.body, at: iso(r.at),
+});
+
+export interface AttendanceRow {
+  item_id: string;
+  person_id: string;
+  status: AttendanceStatus;
+  note: string;
+  marked_by: Nullable<string>;
+  marked_at: string;
+}
+
+export const toAttendance = (r: AttendanceRow): Attendance => ({
+  itemId: r.item_id, userId: r.person_id, status: r.status, note: r.note ?? '', ...(r.marked_by ? { markedBy: r.marked_by } : {}), markedAt: iso(r.marked_at),
 });

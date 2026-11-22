@@ -516,6 +516,43 @@ test('task boards: the company reads, directors and group leads manage, everyone
   assert.equal(await count('maya', `select count(*) from tasks where production_id is null`), 0);
 });
 
+test('attendance: directors and group leads take roll, and people see their own record', async () => {
+  await sys(`insert into schedule_items (id, production_id, title, kind, space, starts_at, ends_at, group_ids)
+             values ('s_roll', 'p_elf', 'Leads run', 'Rehearsal', 'Main Stage', now() - interval '1 hour', now() + interval '1 hour', '{g_leads}')`);
+  await sys(`update memberships set lead_group_ids = '{g_leads}' where production_id = 'p_elf' and person_id = 'u_maya'`);
+  const [lead] = await sys(`select person_id from memberships where production_id = 'p_elf' and 'g_leads' = any (group_ids) and not is_director and person_id <> 'u_maya' order by person_id limit 1`);
+  const [other] = await sys(`select person_id from memberships where production_id = 'p_elf' and not ('g_leads' = any (group_ids)) and not is_director order by person_id limit 1`);
+  // what the app's upsert sends: every column it writes, keys included
+  const mark = (who: Who, person: string, status = 'present', extra = '') =>
+    as(who, `insert into attendance (item_id, person_id, status${extra ? ', marked_by' : ''}) values ('s_roll', '${person}', '${status}'${extra ? `, '${extra}'` : ''})
+             on conflict (item_id, person_id) do update set item_id = excluded.item_id, person_id = excluded.person_id, status = excluded.status, note = excluded.note
+             returning person_id, status, marked_by`);
+
+  // a director marks anyone in the show, and the server records who marked it
+  const byBen = await mark('ben', lead.person_id, 'present', 'u_maya');
+  assert.equal(byBen.error, undefined, byBen.error);
+  assert.equal(byBen[0].marked_by, 'u_ben', 'who marked it can’t be forged');
+  assert.match((await mark('ben', 'u_hb')).error ?? '', /people in this production/, 'only the company is marked');
+
+  // a Team Lead marks the people in their groups, and changes a mark
+  const late = await mark('maya', lead.person_id, 'late');
+  assert.equal(late.error, undefined, late.error);
+  assert.deepEqual([late[0].status, late[0].marked_by], ['late', 'u_maya']);
+  assert.ok((await mark('maya', other.person_id)).error, 'but not people outside their groups');
+  assert.ok((await mark('stranger', lead.person_id)).error, 'outsiders mark no one');
+  assert.match((await as('ben', `update attendance set person_id = '${other.person_id}' where item_id = 's_roll' and person_id = '${lead.person_id}'`)).error ?? '', /new entry/, 'a mark stays with its person');
+
+  // people see their own record; directors and leads see the production's
+  assert.equal((await mark('ben', 'u_maya', 'absent')).error, undefined);
+  assert.equal(await count('maya', `select count(*) from attendance where item_id = 's_roll'`), 2, 'a lead sees the roll');
+  assert.equal(await count(lead.person_id === 'u_renter' ? 'jordan' : 'stranger', `select count(*) from attendance where item_id = 's_roll' and person_id = 'u_maya'`), 0, 'others’ marks stay private');
+  assert.equal(await count('stranger', `select count(*) from attendance`), 0);
+  await sys(`update memberships set lead_group_ids = '{}' where production_id = 'p_elf' and person_id = 'u_maya'`);
+  assert.equal(await count('maya', `select count(*) from attendance where item_id = 's_roll'`), 1, 'without a lead role, only her own mark');
+  assert.ok((await mark('maya', lead.person_id)).error, 'and she no longer takes roll');
+  assert.equal((await as('ben', `delete from attendance where item_id = 's_roll' returning person_id`)).length, 2, 'a director clears the roll');
+});
+
 test('signed-out visitors cannot call the app’s functions', async () => {
   await db.exec(`begin; set local role anon;`);
   await assert.rejects(db.query(`select hold_seats('perf_elf_1', array['A-C1'])`));

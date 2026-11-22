@@ -85,6 +85,7 @@ export default function RootLayout() {
             <Stack.Screen name="checkin/[id]" options={{ title: 'Door Check-in' }} />
             <Stack.Screen name="bookings" options={{ title: 'My Bookings' }} />
             <Stack.Screen name="my-cards" options={{ title: 'Assigned to Me' }} />
+            <Stack.Screen name="attendance/[id]" options={{ title: 'Attendance' }} />
             <Stack.Screen name="tasks" options={{ title: 'Theatre Tasks' }} />
             <Stack.Screen name="task/[id]" options={{ title: 'Task' }} />
             <Stack.Screen name="task/edit" options={{ title: 'Card', presentation: 'modal' }} />
