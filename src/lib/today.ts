@@ -57,14 +57,27 @@ export function needsYou({ user, bookings, linkRequests, schedule, productions, 
     }
   }
 
+  // calls waiting on an answer: listed one by one, or as one line per show when there are several
   const horizon = now.getTime() + rsvpDays * 86_400_000;
-  for (const s of schedule) {
+  const unanswered = new Map<string, ScheduleItem[]>();
+  for (const s of [...schedule].sort((a, b) => a.start.localeCompare(b.start))) {
     if (s.id === skipCallId || s.rsvps[user.id]) continue;
     const start = new Date(s.start).getTime();
     if (start < now.getTime() || start > horizon) continue;
     const p = productions.find((x) => x.id === s.productionId);
     if (!p || !isCalled(s, p, user.id)) continue;
-    out.push({ key: `rsvp:${s.id}`, kind: 'rsvp', title: `RSVP: ${s.title}`, detail: `${p.title} · ${relativeDay(s.start)} ${fmtTime(s.start)}`, href: `/production/${p.id}?tab=schedule&item=${s.id}`, rank: 2 });
+    unanswered.set(p.id, [...(unanswered.get(p.id) ?? []), s]);
+  }
+  for (const [id, calls] of unanswered) {
+    const p = productions.find((x) => x.id === id)!;
+    if (calls.length > 2) {
+      const next = calls[0];
+      out.push({ key: `rsvp:${id}`, kind: 'rsvp', title: `RSVP to ${calls.length} calls`, detail: `${p.title} · next: ${next.title}, ${relativeDay(next.start)} ${fmtTime(next.start)}`, href: `/production/${id}?tab=schedule`, rank: 2 });
+      continue;
+    }
+    for (const s of calls) {
+      out.push({ key: `rsvp:${s.id}`, kind: 'rsvp', title: `RSVP: ${s.title}`, detail: `${p.title} · ${relativeDay(s.start)} ${fmtTime(s.start)}`, href: `/production/${p.id}?tab=schedule&item=${s.id}`, rank: 2 });
+    }
   }
 
   for (const t of tasks) {

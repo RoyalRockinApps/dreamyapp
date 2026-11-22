@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { AddToCalendar } from '@/components/AddToCalendar';
-import { ATTENDANCE_LABELS, attendanceCounts, canTakeAttendance, countsLabel, rollOpen, takesRoll } from '@/lib/attendance';
+import { ATTENDANCE_LABELS, attendanceCounts, canTakeAttendance, countsLabel, rollIds, rollOpen, takesRoll } from '@/lib/attendance';
 import { ChannelRow } from '@/components/ChannelList';
 import { MonthCalendar } from '@/components/MonthCalendar';
 import { ProductionAuditions } from '@/components/ProductionAuditions';
@@ -137,9 +137,9 @@ function ScheduleCard({ item, p, canEdit, highlighted }: { item: ScheduleItem; p
   const attendance = useStore((s) => s.attendance);
   const myMark = attendance.find((a) => a.itemId === item.id && a.userId === user.id);
   const rollers = takesRoll(user, p);
-  const rollIds = rollers ? called.filter((id) => canTakeAttendance(user, p, id)) : [];
-  const rollCount = rollIds.length;
-  const rollMarked = rollIds.filter((id) => attendance.some((a) => a.itemId === item.id && a.userId === id)).length;
+  const myRoll = rollers ? rollIds(item, p).filter((id) => canTakeAttendance(user, p, id)) : [];
+  const rollCount = myRoll.length;
+  const rollMarked = myRoll.filter((id) => attendance.some((a) => a.itemId === item.id && a.userId === id)).length;
   const groups = item.groupIds.length ? item.groupIds.map((g) => p.groups.find((x) => x.id === g)).filter(Boolean) : null;
   const isPast = new Date(item.end) < new Date();
   const kindColor = ['Tech', 'Dress', 'Performance', 'Strike'].includes(item.kind) ? C.curtain : item.kind === 'Call Time' ? C.gold : C.purple;
@@ -485,7 +485,7 @@ function TicketsSummary({ p }: { p: Production }) {
       {performances.length === 0 && <Txt v="small">No performances yet.</Txt>}
       {isOwner ? (
         <Row>
-          <Button small style={{ flex: 1 }} variant="secondary" icon="add" title="Add performance" onPress={() => router.push(`/performance/new?productionId=${p.id}` as Href)} />
+          <Button small style={{ flex: 1.35 }} variant="secondary" icon="add" title="Add performance" onPress={() => router.push(`/performance/new?productionId=${p.id}` as Href)} />
           <Button small style={{ flex: 1 }} variant="secondary" icon="briefcase-outline" title="Box office" onPress={() => router.navigate('/business?view=boxOffice' as Href)} />
         </Row>
       ) : (

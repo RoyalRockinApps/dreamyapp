@@ -50,16 +50,18 @@ test('needs you: the owner sees requests and accounts; cast see RSVPs, due cards
   assert.equal(maya[0].kind, 'card', 'an overdue card comes first');
   assert.match(maya[0].detail, /^Overdue since Nov 17 · /);
   assert.ok(maya.some((n) => n.kind === 'announcement' && n.title === 'New announcements · Elf'));
-  for (const n of maya.filter((x) => x.kind === 'rsvp')) {
-    const item = seed.schedule.find((s) => `rsvp:${s.id}` === n.key)!;
-    assert.equal(item.rsvps[MEMBER_ID], undefined, 'only calls without an answer');
-  }
+  // Maya hasn't answered any calls in the demo: several in two weeks become one line for the show
+  const rsvps = maya.filter((x) => x.kind === 'rsvp');
+  assert.equal(rsvps.length, 1);
+  assert.match(rsvps[0].title, /^RSVP to \d+ calls$/);
+  assert.equal(rsvps[0].href, '/production/p_elf?tab=schedule');
 
-  const first = maya.find((n) => n.kind === 'rsvp');
-  if (first) {
-    const skip = first.key.slice('rsvp:'.length);
-    assert.ok(!needsYou({ ...base, user: who(MEMBER_ID), tasks, skipCallId: skip }).some((n) => n.key === first.key), 'the call on its own card is left out');
-  }
+  // two or fewer are listed one by one, without the call that has its own card
+  const soon = seed.schedule.filter((s) => s.productionId === 'p_elf' && new Date(s.start) > now).sort((a, b) => a.start.localeCompare(b.start)).slice(0, 3);
+  const few = needsYou({ ...base, schedule: soon, user: who(MEMBER_ID), tasks: [], skipCallId: soon[0].id }).filter((n) => n.kind === 'rsvp');
+  const calledTo = soon.slice(1).filter((s) => s.groupIds.length === 0 || s.groupIds.includes('g_leads'));
+  assert.deepEqual(few.map((n) => n.key), calledTo.map((s) => `rsvp:${s.id}`));
+  assert.ok(few.every((n) => n.title.startsWith('RSVP: ')));
 });
 
 test('the calendar shows each person their calls, and their cards on the day they are due', () => {

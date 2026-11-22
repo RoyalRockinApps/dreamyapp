@@ -1,7 +1,7 @@
 import { addDays, dayKey, localIso, startOfDay } from './dates';
 import { ticketCode } from './ids';
 import { quoteRental } from './pricing';
-import { calledMemberIds } from './scheduling';
+import { rollIds } from './attendance';
 import { buildLayout, orderTotals, priceFor } from './seating';
 import type {
   Attendance,
@@ -375,7 +375,7 @@ export function buildSeed(now: Date = new Date()): SeedData {
   const attendance: Attendance[] = [];
   for (const s of schedule) {
     if (new Date(s.end) >= now) continue;
-    for (const id of calledMemberIds(s, elf)) {
+    for (const id of rollIds(s, elf)) {
       const excused = conflicts.some((c) => c.userId === id && c.start < s.end && c.end > s.start);
       const r = rollRand();
       const status = excused ? 'excused' : r < 0.86 ? 'present' : r < 0.95 ? 'late' : 'absent';

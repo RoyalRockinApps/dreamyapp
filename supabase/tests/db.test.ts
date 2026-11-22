@@ -539,6 +539,7 @@ test('attendance: directors and group leads take roll, and people see their own 
   assert.equal(late.error, undefined, late.error);
   assert.deepEqual([late[0].status, late[0].marked_by], ['late', 'u_maya']);
   assert.ok((await mark('maya', other.person_id)).error, 'but not people outside their groups');
+  assert.ok((await mark('maya', 'u_maya')).error, 'or themselves');
   assert.ok((await mark('stranger', lead.person_id)).error, 'outsiders mark no one');
   assert.match((await as('ben', `update attendance set person_id = '${other.person_id}' where item_id = 's_roll' and person_id = '${lead.person_id}'`)).error ?? '', /new entry/, 'a mark stays with its person');
 

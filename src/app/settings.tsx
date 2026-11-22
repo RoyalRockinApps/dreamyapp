@@ -14,7 +14,7 @@ import { C } from '@/theme';
 const PERSONAS = [
   { id: OWNER_ID, label: 'Theatre owner', desc: 'Everything: rentals, deposits, productions, box office, check-in.' },
   { id: RENTER_ID, label: 'Visitor', desc: 'Not in a company: applies for auditions here, and rents or buys tickets at thedreamtheatre.com.' },
-  { id: MEMBER_ID, label: 'Cast member', desc: 'Sees their calls, RSVPs, submits conflicts and chats with the company.' },
+  { id: MEMBER_ID, label: 'Cast member', desc: 'Their calls and RSVPs, roll for the Leads (she’s their Team Lead), her cards, conflicts and company chat.' },
 ];
 
 export default function Me() {

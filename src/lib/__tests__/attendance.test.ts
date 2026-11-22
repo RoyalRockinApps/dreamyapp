@@ -18,6 +18,7 @@ test('directors and the owner take roll for anyone; a Team Lead for the people i
   assert.equal(canTakeAttendance(who('u_ben'), elf, crew.userId), true, 'Ben directs Elf');
   assert.equal(canTakeAttendance(who(MEMBER_ID), elf, lead.userId), true, 'Maya leads the Leads');
   assert.equal(canTakeAttendance(who(MEMBER_ID), elf, crew.userId), false);
+  assert.equal(canTakeAttendance(who(MEMBER_ID), elf, MEMBER_ID), false, 'a lead doesn’t mark themselves');
   assert.equal(takesRoll(who(MEMBER_ID), elf), true);
   assert.equal(takesRoll(who('u_hannah'), elf), false, 'cast without a lead role don’t take roll');
 

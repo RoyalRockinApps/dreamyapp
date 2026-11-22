@@ -1,5 +1,5 @@
 -- Rehearsal attendance: at each call, a director (or the owner) takes roll for everyone called,
--- and a group's Team Lead takes roll for the people in their groups. Each person is marked
+-- and a group's Team Lead takes roll for the other people in their groups. Each person is marked
 -- present, late, absent or excused. People see their own record; directors, the owner and Team
 -- Leads see their production's.
 
@@ -16,14 +16,14 @@ create index attendance_person_idx on public.attendance (person_id);
 
 -- ---------- who takes roll ----------
 
--- Does the signed-in person lead a group that this member of the item's production belongs to?
+-- Does the signed-in person lead a group that this other member of the production belongs to?
 create function private.leads_member(p_production text, p_person text) returns boolean
 language sql stable security definer set search_path = '' as $$
   select exists (
     select 1 from public.memberships lead
       join public.people me on me.id = lead.person_id
       join public.memberships target on target.production_id = lead.production_id and target.person_id = p_person
-     where lead.production_id = p_production and me.auth_user_id = auth.uid()
+     where lead.production_id = p_production and me.auth_user_id = auth.uid() and me.id <> p_person
        and lead.lead_group_ids && target.group_ids
   )
 $$;

@@ -11,9 +11,10 @@ export const ATTENDANCE_LABELS: Record<AttendanceStatus, string> = {
   excused: 'Excused',
 };
 
-/** Directors and the owner mark anyone in the show; a Team Lead marks the people in their groups. */
+/** Directors and the owner mark anyone in the show; a Team Lead marks the others in their groups. */
 export function canTakeAttendance(user: User, production: Production, memberId: string): boolean {
   if (canManageProduction(production, user)) return true;
+  if (memberId === user.id) return false;
   const leads = production.members.find((m) => m.userId === user.id)?.leadGroupIds ?? [];
   const member = production.members.find((m) => m.userId === memberId);
   return !!member && leads.some((g) => member.groupIds.includes(g));
@@ -24,9 +25,15 @@ export function takesRoll(user: User, production: Production): boolean {
   return canManageProduction(production, user) || (production.members.find((m) => m.userId === user.id)?.leadGroupIds?.length ?? 0) > 0;
 }
 
-/** The people called to this item that this person can mark, by name. */
+/** Everyone on a call's roll: the people called, apart from directors, who take it. */
+export function rollIds(item: ScheduleItem, production: Production): string[] {
+  const directors = new Set(production.members.filter((m) => m.isDirector).map((m) => m.userId));
+  return calledMemberIds(item, production).filter((id) => !directors.has(id));
+}
+
+/** The people on this call's roll that this person can mark, by name. */
 export function rollFor(item: ScheduleItem, production: Production, user: User, users: User[]): User[] {
-  return calledMemberIds(item, production)
+  return rollIds(item, production)
     .filter((id) => canTakeAttendance(user, production, id))
     .map((id) => users.find((u) => u.id === id))
     .filter((u): u is User => !!u)
